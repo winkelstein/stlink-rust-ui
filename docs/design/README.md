@@ -1,104 +1,104 @@
-# Дизайн GUI (Этап 2)
+# GUI design (Stage 2)
 
-Источник: холст «stlink-rust-ui — GUI» в Claude (Design). Здесь лежит копия его исходников:
+Source: the "stlink-rust-ui — GUI" canvas in Claude (Design). This folder holds a copy of its sources:
 
-- `Main.dc.html` — **все экраны, оверлеи, тексты на двух языках и логика переходов в одном файле** (интерактивный прототип). Главный источник для вёрстки: разметка, CSS-токены, словарь `T` (ru/en), данные журнала `LOG`.
-- `canvas.json` — раскладка холста и заметки (правила быстрой записи — `notes.sQuick`, подключение к программатору — `notes.sConn`, настройки/журнал — `notes.sSet`). Остальные артборды холста — тонкие обёртки, которые показывают `Main` в конкретном состоянии (`screen`, `overlay`, `lang`, `dark`), поэтому сюда не скопированы.
-- В словаре `T` остались ключи убранных функций (`autoConnect*`, `onConnect`, `armed*`, `turnOff`): в приложение они не переносятся.
+- `Main.dc.html`: **every screen, overlay, the copy in both languages and the navigation logic in one file** (interactive prototype). The main reference for the markup: layout, CSS tokens, the `T` dictionary (ru/en), the `LOG` sample data.
+- `canvas.json`: canvas layout and notes (quick-flash rules in `notes.sQuick`, connecting to the probe in `notes.sConn`, settings/log in `notes.sSet`). The other canvas artboards are thin wrappers that show `Main` in a given state (`screen`, `overlay`, `lang`, `dark`), so they are not copied here.
+- The `T` dictionary still contains keys of removed features (`autoConnect*`, `onConnect`, `armed*`, `turnOff`): they are not ported to the app.
 
-Формат `.dc.html` — не React: `{{hole}}` = значения из `renderVals()`, `<sc-if>`/`<sc-for>` = условия/циклы. Переносить в React + TS вручную, сохраняя структуру, токены и тексты.
+The `.dc.html` format is not React: `{{hole}}` = values from `renderVals()`, `<sc-if>`/`<sc-for>` = conditionals/loops. Port to React + TS by hand, keeping the structure, tokens and copy.
 
-## Общее
+## General
 
-- Стиль: нативный macOS. Шрифт `-apple-system` (SF Pro), моноширинный `ui-monospace` (SF Mono) для адресов, hex, версий, CRC, журнала.
-- Тема: Системная / Светлая / Тёмная (настройка). Токены — CSS-переменные в `.win` / `.win.dark`.
-- Язык: Системный / Русский / English (настройка). Все строки — в словаре `T` в `Main.dc.html`; в приложении вынести в `src/i18n/{ru,en}.ts` с теми же ключами. Числа: в ru десятичная запятая (`3,28 В`), в en точка (`3.28 V`).
-- Окно: 920×620 (минимальный размер), titlebar 52 px с traffic lights, степпером и кнопками «Журнал» и «Настройки»; footer 60 px с действиями.
-- Мастер из 3 шагов: **Устройство → Параметры → Выполнение**.
+- Style: native macOS. Font `-apple-system` (SF Pro), monospace `ui-monospace` (SF Mono) for addresses, hex, versions, CRC and the log.
+- Theme: System / Light / Dark (setting). Tokens are CSS variables on `.win` / `.win.dark`.
+- Language: System / Русский / English (setting). All strings are in the `T` dictionary in `Main.dc.html`; in the app they live in `src/i18n/{ru,en}.ts` with the same keys. Numbers: decimal comma in ru (`3,28 В`), point in en (`3.28 V`).
+- Window: 920×620 (minimum size), 52 px titlebar with traffic lights, the stepper and the "Log" and "Settings" buttons; 60 px footer with actions.
+- A 3-step wizard: **Device → Options → Run**.
 
-## Экраны (`screen`)
+## Screens (`screen`)
 
-| screen | Что |
+| screen | What |
 |---|---|
-| `empty` | Нет устройства, ожидание (hot-plug) |
-| `released` | Программатор найден, но **не открыт приложением** (при появлении, после «Отключить» или неудачного подключения). Кнопка «Подключиться», данные из USB-дескриптора (модель, VID:PID, серийник). Если программатор занят другой программой — текст «занят другой программой» и «Повторить» |
-| `device` | Карточка «Быстрая запись»; карточки «Программатор» и «Микроконтроллер»; три действия: «Записать прошивку», «Прочитать в файл», «Стереть всё» (красная). Footer: статус «подключён» + «Отключить», справа «Перезагрузить МК» (аппаратный сброс и запуск) |
-| `eraseConfirm` | Sheet поверх `device`: стереть весь flash (оба банка, адреса), красная кнопка «Стереть всё» |
-| `eraseProgress` / `eraseDone` | Стадии «Банк 1», «Банк 2» (красный прогресс); итог: «Flash стёрт», МК остановлен; «Записать прошивку» |
-| `write` | Файл .bin, адрес, галочки «Проверять», «Перезагружать МК», «Перезаписывать при изменении файла»; карта flash, оценка времени. «Стереть и записать» |
-| `confirm` | Sheet поверх `write`: какие сектора и адреса будут стёрты (из `flash::plan_write`) |
-| `writeProgress` / `writeDone` | 3 стадии: стирание, программирование, проверка; итог с CRC32, «Записать снова ⌘R» |
-| `read` / `readProgress` / `readDone` | Область (весь flash / банк 1 / банк 2 / диапазон), имя файла, прогресс, итог с CRC32 и «Показать в Finder» |
+| `empty` | No device, waiting (hot-plug) |
+| `released` | A probe is detected but **not opened by the app** (when it appears, after "Disconnect" or a failed connect). "Connect" button, data from the USB descriptor (model, VID:PID, serial). If another program holds the probe: "in use by another program" text and "Retry" |
+| `device` | "Quick flash" card; "Programmer" and "Microcontroller" cards; three actions: "Flash firmware", "Read to file", "Erase all" (red). Footer: "connected" status + "Disconnect", on the right "Restart MCU" (hardware reset and run) |
+| `eraseConfirm` | Sheet over `device`: erase the entire flash (both banks, addresses), red "Erase all" button |
+| `eraseProgress` / `eraseDone` | Stages "Bank 1", "Bank 2" (red progress); result: "Flash erased", MCU halted; "Flash firmware" |
+| `write` | .bin file, address, checkboxes "Verify", "Restart MCU", "Re-flash when the file changes"; flash map, time estimate. "Erase and flash" |
+| `confirm` | Sheet over `write`: which sectors and addresses will be erased (from `flash::plan_write`) |
+| `writeProgress` / `writeDone` | 3 stages: erase, program, verify; result with CRC32, "Flash again ⌘R" |
+| `read` / `readProgress` / `readDone` | Range (entire flash / bank 1 / bank 2 / custom), file name, progress, result with CRC32 and "Show in Finder" |
 
-## Оверлеи (`overlay`, sheet поверх любого экрана)
+## Overlays (`overlay`, a sheet over any screen)
 
-- **Настройки** (кнопка в titlebar, ⌘,). Две колонки:
-  - Общие: Язык, Оформление.
-  - Запись: Проверять после записи, Перезагружать МК после записи, Всегда спрашивать перед стиранием.
-  - Программатор: Частота SWD (4 МГц / 1,8 МГц / 950 кГц / 480 кГц), Подключаться со сбросом, Держать отладку в low-power. Применяются при следующем «Подключиться».
-  - Журнал: Подробный журнал USB (TRACE).
-  Настройки сохраняются (`settings.json` в каталоге конфигурации приложения); «Проверять» и «Перезагружать» — те же флаги, что галочки на экране записи.
-- **Журнал** (кнопка в titlebar). Фильтр Все / Ошибки (WARN+ERROR) / USB (TRACE); «Копировать», «Сохранить…», «Очистить»; строки: время, уровень (бейдж), сообщение моноширинным; ERROR подсвечены. TRACE-пакеты появляются, только если включён «Подробный журнал USB». Источник — `tracing` из `stlink` (уровни как в библиотеке).
+- **Settings** (titlebar button, ⌘,). Two columns:
+  - General: Language, Appearance.
+  - Flashing: Verify after writing, Restart MCU after writing, Always confirm before erasing.
+  - Programmer: SWD clock (4 MHz / 1.8 MHz / 950 kHz / 480 kHz), Connect under reset, Keep debug in low-power modes. Applied on the next "Connect".
+  - Log: Verbose USB log (TRACE).
+  Settings are persisted (`settings.json` in the app config directory); "Verify" and "Restart" are the same flags as the checkboxes on the write screen.
+- **Log** (titlebar button). Filter All / Errors (WARN+ERROR) / USB (TRACE); "Copy", "Save…", "Clear"; rows: time, level (badge), message in monospace; ERROR rows highlighted. TRACE packets appear only with "Verbose USB log" on. Source: `tracing` from `stlink` (levels as in the library).
 
-## Подключение к программатору
+## Connecting to the probe
 
-- Приложение **никогда не подключается к ST-Link само**. Найденный программатор показывается на `released` (данные из USB-дескриптора, устройство не открывается), пользователь жмёт «Подключиться».
-- «Отключить» в футере `device` закрывает устройство (drop `StLink` → выход из debug, интерфейс USB освобождён), чтобы ST-Link могли взять VS Code, OpenOCD или st-flash. Переход на `released`.
-- Отключение кабеля → `empty`; появление снова → `released`.
-- Если устройство занято другой программой (`Error::Busy`) — `released` с текстом «занят другой программой» и кнопкой «Повторить» (`TODO(design)`: вариант не нарисован, та же вёрстка).
+- The app **never connects to an ST-Link on its own**. A detected probe is shown on `released` (USB descriptor data, the device is not opened); the user presses "Connect".
+- "Disconnect" in the `device` footer closes the device (drop `StLink` → exit debug, USB interface released) so VS Code, OpenOCD or st-flash can take the ST-Link. Goes to `released`.
+- Cable unplugged → `empty`; plugged back → `released`.
+- If another program holds the device (`Error::Busy`): `released` with "in use by another program" and a "Retry" button (`TODO(design)`: this variant is not drawn, same layout).
 
-## Быстрая запись — правила
+## Quick flash rules
 
-- Последний файл и адрес запоминаются для каждого чипа (по UID).
-- «Записать ⌘R» запускает запись сразу, без мастера. Подтверждение пропускается, только если стираются те же сектора, что при последней подтверждённой записи, и выключено «Всегда спрашивать перед стиранием»; иначе — обычный `confirm`.
-- «При изменении файла»: слежение за .bin; запись через ~1 с после последнего изменения (debounce), не запускается, если CRC не изменился, идёт другая операция или программатор отключён.
-- Записи при подключении платы нет: приложение не открывает программатор само.
+- The last file and address are remembered per chip (by UID).
+- "Flash ⌘R" starts flashing right away, without the wizard. The confirmation is skipped only when the same sectors are erased as in the last confirmed write and "Always confirm before erasing" is off; otherwise the regular `confirm` sheet is shown.
+- "When the file changes": the .bin is watched; flashing starts ~1 s after the last change (debounce) and does not start if the CRC is unchanged, another operation is running or the probe is disconnected.
+- There is no flashing on board connect: the app never opens the probe on its own.
 
-## Иконка приложения
+## App icon
 
-Исходник `src-tauri/icons/app-icon.svg` (+ `app-icon.png` 1024). Полный набор для Tauri (`icon.icns`, `icon.ico`, PNG) уже сгенерирован `tauri icon` и лежит в `src-tauri/icons/`. При изменении: `npm run tauri icon src-tauri/icons/app-icon.png`.
+Source `src-tauri/icons/app-icon.svg` (+ `app-icon.png` at 1024). The full Tauri set (`icon.icns`, `icon.ico`, PNGs) is generated by `tauri icon` into `src-tauri/icons/`. After a change: `npm run tauri icon src-tauri/icons/app-icon.png`.
 
-## Значения в макетах
+## Values in the mockups
 
-Серийник, UID, CRC, имена файлов, время и строки журнала — примеры. Реальные значения брать из `stlink` (`ProbeInfo`, `TargetInfo`, `Progress`, tracing).
+Serial number, UID, CRC, file names, timings and log lines are examples. Real values come from `stlink` (`ProbeInfo`, `TargetInfo`, `Progress`, tracing).
 
-## Реализация
+## Implementation
 
-Фронтенд (`src/`) повторяет прототип на React 19 + TypeScript без UI-китов: токены и общие классы из `Main.dc.html` лежат в `src/styles/tokens.css`, разметка экранов перенесена с теми же размерами, тексты — в словарях `src/i18n/`. Бэкенд — `src-tauri` поверх библиотеки `stlink`; в браузере (и с `VITE_BACKEND=mock`) работает `MockBackend`.
+The frontend (`src/`) follows the prototype in React 19 + TypeScript without UI kits: tokens and shared classes from `Main.dc.html` live in `src/styles/tokens.css`, screen markup is ported with the same sizes, copy is in the `src/i18n/` dictionaries. The backend is `src-tauri` on top of the `stlink` library; in the browser (and with `VITE_BACKEND=mock`) `MockBackend` is used.
 
-| Где | Что |
+| Where | What |
 |---|---|
-| `src/backend/types.ts` | DTO Tauri-команд, зеркалят типы `stlink` (`ProbeSummary`/`ProbeInfo`, `TargetInfo`, `FlashPlan`, `Progress`, `EraseResult`, `BackendError { kind, message }`), `AppSettings`, `LogEntry` |
-| `src/backend/Backend.ts` | Интерфейс бэкенда: hot-plug, `connect`/`disconnect`, `planWrite`, `write`/`read`/`eraseAll` с прогрессом и `AbortSignal`, `resetAndRun`, файлы (выбор, drag-and-drop, слежение), быстрая запись по UID, настройки, журнал |
-| `src/backend/TauriBackend.ts` | `invoke` + события (`device-event`, `log://entry`), прогресс через `Channel`, отмена через `cancel_op` |
-| `src/backend/mock/` | `MockBackend`: стенд (ST-Link V2J46S7 + STM32H743, 3,28 В) на таймерах, скорости из CLAUDE.md (bank erase 5,5 с/МБ), журнал из `LOG`, настройки в `localStorage` |
-| `src/i18n/` | `ru.ts`/`en.ts` (ключи как в `T`; строки с примерами значений — функции), `core.ts` (язык: «Системный» → `navigator.languages`, `ru*` → ru, иначе en; числа и единицы по языку), `index.tsx` (`I18nProvider`, `useT()` → `{ t, f, lang }`) |
-| `src/domain/` | Чистая логика с тестами: порт `plan_write`, валидация адресов, оценки времени, форматирование по языку, правила быстрой записи |
-| `src/state/machine.ts` | Машина состояний: экраны `empty`, `released`, `device`, `erase*`, `write*`, `read*`; оверлеи `settings`/`log`; плашки ошибок без текста (`kind` + контекст + `message`) |
-| `src/state/controller.ts` | Побочные эффекты: вызовы бэкенда, отмена, debounce слежения за файлом, сохранение настроек |
-| `src/components/`, `src/screens/` | Общие компоненты (`WindowChrome`, `Sheet`, `ConfirmSheet`, `FlashMap`, `ErrorBanner`, …), экраны и листы `SettingsSheet`, `LogSheet` |
-| `src/dev/DevPanel.tsx` | Dev-панель mock-режима |
+| `src/backend/types.ts` | Tauri command DTOs mirroring `stlink` types (`ProbeSummary`/`ProbeInfo`, `TargetInfo`, `FlashPlan`, `Progress`, `EraseResult`, `BackendError { kind, message }`), `AppSettings`, `LogEntry` |
+| `src/backend/Backend.ts` | Backend interface: hot-plug, `connect`/`disconnect`, `planWrite`, `write`/`read`/`eraseAll` with progress and `AbortSignal`, `resetAndRun`, files (picker, drag-and-drop, watching), quick flash per UID, settings, log |
+| `src/backend/TauriBackend.ts` | `invoke` + events (`device-event`, `log://entry`), progress via `Channel`, cancellation via `cancel_op` |
+| `src/backend/mock/` | `MockBackend`: the bench (ST-Link V2J46S7 + STM32H743, 3.28 V) on timers, speeds from CLAUDE.md (bank erase 5.5 s/MB), log from `LOG`, settings in `localStorage` |
+| `src/i18n/` | `ru.ts`/`en.ts` (keys as in `T`; strings with example values are functions), `core.ts` (language: "System" → `navigator.languages`, `ru*` → ru, otherwise en; numbers and units per language), `index.tsx` (`I18nProvider`, `useT()` → `{ t, f, lang }`) |
+| `src/domain/` | Pure logic with tests: port of `plan_write`, address validation, time estimates, per-language formatting, quick-flash rules |
+| `src/state/machine.ts` | State machine: screens `empty`, `released`, `device`, `erase*`, `write*`, `read*`; overlays `settings`/`log`; error banners without copy (`kind` + context + `message`) |
+| `src/state/controller.ts` | Side effects: backend calls, cancellation, file-watch debounce, persisting settings |
+| `src/components/`, `src/screens/` | Shared components (`WindowChrome`, `Sheet`, `ConfirmSheet`, `FlashMap`, `ErrorBanner`, …), screens and the `SettingsSheet`, `LogSheet` sheets |
+| `src/dev/DevPanel.tsx` | Mock-mode dev panel |
 
-**Подключение.** Hot-plug приходит из `nusb::watch_devices`; найденный программатор не открывается. «Подключиться» → `connect` (open → напряжение → connect → identify → RDP, геометрия) с параметрами программатора из настроек; «Отключить» → `disconnect` (drop `StLink`). Плашка CoreNotAccessible предлагает подключиться ещё раз со сбросом или с отладкой в low-power (разово, настройки не меняются).
+**Connecting.** Hot-plug comes from `nusb::watch_devices`; a detected probe is not opened. "Connect" → `connect` (open → voltage → connect → identify → RDP, geometry) with the probe options from Settings; "Disconnect" → `disconnect` (drop `StLink`). The CoreNotAccessible banner offers to connect again under reset or with debug kept in low-power (one-off, settings are not changed).
 
-**Полное стирание.** `flash::mass_erase`: bank erase по банкам (H7: BER + START), прогресс — по банкам, отмена — между банками. Внутри банка полоса заполняется по оценке времени (или по времени прошлого банка). После стирания ядро остановлено.
+**Erase all.** `flash::mass_erase`: bank erase per bank (H7: BER + START), progress per bank, cancellation between banks. Within a bank the bar fills by the time estimate (or by the previous bank's time). After erasing, the core is halted.
 
-**Журнал.** В `src-tauri` свой `tracing` layer: кольцевой буфер на 5000 строк, новые строки пакетами в событии `log://entry` не чаще раза в 100 мс; тот же фильтр пишет файл `~/Library/Logs/com.andrewwinkelstein.stlink-rust-ui/stlink-ui.log`. TRACE `stlink` (USB-пакеты) включается «Подробным журналом USB» на лету (`reload::Handle`), `nusb` выключен. Ошибки команд попадают в журнал с `message`; в UI — по `kind` из словаря, `message` — под «Подробнее».
+**Log.** `src-tauri` has its own `tracing` layer: a ring buffer of 5000 lines, new lines batched into the `log://entry` event at most every 100 ms; the same filter writes the file `~/Library/Logs/com.andrewwinkelstein.stlink-rust-ui/stlink-ui.log`. `stlink` TRACE (USB packets) is toggled on the fly by "Verbose USB log" (`reload::Handle`), `nusb` is silenced. Command errors go to the log with their `message`; the UI shows text by `kind` from the dictionary, with `message` under "Details".
 
-**Чтение.** Диапазон проверяется по flash подключённого чипа (`readableFlash`: геометрия, иначе размер flash): начало внутри flash, конец не дальше конца flash; пустой размер — «до конца flash»; под полем — максимум от текущего адреса; «Прочитать» неактивна при ошибке. То же проверяют Tauri-команда и библиотека (`Error::OutOfFlash`).
+**Read.** The range is checked against the connected chip's flash (`readableFlash`: geometry, otherwise flash size): start inside flash, end not past the end of flash; an empty size means "to the end of flash"; the field shows the maximum from the current address; "Read" is disabled on an error. The Tauri command and the library check the same (`Error::OutOfFlash`).
 
-**Окно не прокручивается.** `html, body, #root` — `overflow: hidden`, `overscroll-behavior: none`; прокручиваются только содержимое экранов и список журнала (`overscroll-behavior: contain`). Масштаб выключен: `zoomHotkeysEnabled: false`, Ctrl/⌘+колесо, щипок и Ctrl/⌘ +/−/0 перехватываются (`src/noZoom.ts`).
+**The window does not scroll.** `html, body, #root`: `overflow: hidden`, `overscroll-behavior: none`; only screen content and the log list scroll (`overscroll-behavior: contain`). Zoom is disabled: `zoomHotkeysEnabled: false`, Ctrl/⌘+wheel, pinch and Ctrl/⌘ +/−/0 are intercepted (`src/noZoom.ts`).
 
-**Платформы.** `src/platform.ts` — единственное место, где определяется ОС (`navigator.userAgentData`, иначе `navigator.platform`): модификатор и подписи горячих клавиш (⌘ / Ctrl), «Показать в Finder / в проводнике / в папке». Пути загрузок — из Tauri path API, на Windows в нативном виде (`C:\Users\…`), склейка — с нативным разделителем. Шрифты: SF / Segoe UI Variable / Segoe UI, моно SF Mono / Cascadia Mono / Consolas. Windows-драйверы — `docs/windows.md`.
+**Platforms.** `src/platform.ts` is the only place that detects the OS (`navigator.userAgentData`, otherwise `navigator.platform`): shortcut modifier and labels (⌘ / Ctrl), "Show in Finder / in Explorer / in folder". Download paths come from the Tauri path API, native on Windows (`C:\Users\…`), joined with the native separator. Fonts: SF / Segoe UI Variable / Segoe UI, monospace SF Mono / Cascadia Mono / Consolas. Windows drivers: `docs/windows.md`.
 
-**Запуск:** `npm run dev` (браузер, http://localhost:1420, mock) или `npm run tauri dev`. Проверки: `npm run build` (tsc + vite), `npm test` (vitest: `domain/`, i18n, reducer, платформа). CI и релизы — `docs/release.md`.
+**Run:** `npm run dev` (browser, http://localhost:1420, mock) or `npm run tauri dev`. Checks: `npm run build` (tsc + vite), `npm test` (vitest: `domain/`, i18n, reducer, platform). CI and releases: `docs/release.md`.
 
-**Dev-панель** есть только в mock-режиме: **⌥⌘D** (Alt+Ctrl+D вне macOS). С панели можно вставить и выдернуть программатор, сымитировать «занят другой программой», пересборку отслеживаемого файла (с новым CRC или с тем же), ошибку для следующей операции (`Disconnected` посреди записи, чтения или стирания, `CoreNotAccessible`, `FlashProtected`, `Busy`, ошибку посреди полного стирания), множитель скорости ×1/×5/×20 и язык. Сбросить сохранённое: удалить ключи `stlink-ui.*` в `localStorage`.
+**Dev panel** exists only in mock mode: **⌥⌘D** (Alt+Ctrl+D outside macOS). From it you can plug and unplug the probe, simulate "in use by another program", a rebuild of the watched file (new or same CRC), an error for the next operation (`Disconnected` in the middle of a write, read or erase, `CoreNotAccessible`, `FlashProtected`, `Busy`, an error in the middle of a full erase), a speed multiplier ×1/×5/×20 and the language. To reset stored data, delete the `stlink-ui.*` keys in `localStorage`.
 
-**Клавиатура:** ⌘R (на Windows и Linux Ctrl+R) — быстрая запись на экранах «Устройство» и «Готово»; ⌘, (Ctrl+,) — настройки; Esc закрывает лист; в листах подтверждения Enter подтверждает, Tab не выходит за пределы листа.
+**Keyboard:** ⌘R (Ctrl+R on Windows and Linux): quick flash on the "Device" and "Done" screens; ⌘, (Ctrl+,): Settings; Esc closes a sheet; in confirmation sheets Enter confirms and Tab stays inside the sheet.
 
-**Окно Tauri:** 920×620 (это же минимальный размер). macOS (`tauri.macos.conf.json`): `titleBarStyle: Overlay` + `hiddenTitle`, системные traffic lights поверх нашего titlebar, в нём `data-tauri-drag-region`; нарисованные кружки — только в браузере на macOS. Windows (`tauri.windows.conf.json`): нативная рамка с системными кнопками, наша полоса — под ней, без перетаскивания. Нативные контролы (галочки, select) следуют теме приложения (`color-scheme` на `.win`).
+**Tauri window:** 920×620 (also the minimum size). macOS (`tauri.macos.conf.json`): `titleBarStyle: Overlay` + `hiddenTitle`, system traffic lights over our titlebar, which has `data-tauri-drag-region`; the drawn dots appear only in the browser on macOS. Windows (`tauri.windows.conf.json`): native frame with system buttons, our strip below it, not draggable. Native controls (checkboxes, select) follow the app theme (`color-scheme` on `.win`).
 
-**Ограничения mock-режима:** в браузере нет диалога сохранения: «Изменить…» спрашивает имя файла, результат чтения и журнал скачиваются.
+**Mock-mode limitations:** the browser has no save dialog: "Change…" asks for a file name, read results and the log are downloaded.
 
-**Не нарисовано в макете** (помечено `TODO(design)` в коде): плашки ошибок, `released` в вариантах «занят» и «нужен драйвер WinUSB», карточка МК во время подключения, карточка быстрой записи без файла, МК без драйвера flash (плитки записи и стирания неактивны с подсказкой).
+**Not drawn in the mockups** (marked `TODO(design)` in the code): error banners, the "busy" and "WinUSB driver needed" variants of `released`, the MCU card while connecting, the quick-flash card without a file, an MCU without a flash driver (flash and erase tiles disabled with a hint).

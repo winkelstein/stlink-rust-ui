@@ -1,70 +1,70 @@
-# Сборка и выпуск
+# Build and release
 
 ## CI (`.github/workflows/ci.yml`)
 
-На каждый push и PR, матрица macOS / Windows / Ubuntu 22.04:
+On every push and PR, matrix macOS / Windows / Ubuntu 22.04:
 
-1. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`. Тест на железе (`#[ignore]`) в CI не запускается.
+1. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`. The hardware test (`#[ignore]`) does not run in CI.
 2. `npm ci`, `npm run build`, `npm test`.
-3. `npm run tauri build`: на macOS universal (`--target universal-apple-darwin`), на Linux — AppImage и deb.
-4. Установщики — в артефактах прогона (Actions → прогон → Artifacts): `stlink-rust-ui-macOS` (dmg, app), `-Windows` (msi, nsis `-setup.exe`), `-Linux` (AppImage, deb).
+3. `npm run tauri build`: universal on macOS (`--target universal-apple-darwin`), AppImage and deb on Linux.
+4. Installers are attached to the run (Actions → run → Artifacts): `stlink-rust-ui-macOS` (dmg, app), `-Windows` (msi, nsis `-setup.exe`), `-Linux` (AppImage, deb).
 
-Права `GITHUB_TOKEN` — `contents: read`.
+`GITHUB_TOKEN` permissions: `contents: read`.
 
-## Выпуск релиза (`.github/workflows/release.yml`)
+## Releasing (`.github/workflows/release.yml`)
 
-1. Поднять версию в трёх местах (должны совпадать):
+1. Bump the version in three places (they must match):
    - `Cargo.toml` → `[workspace.package] version`
    - `src-tauri/tauri.conf.json` → `version`
    - `package.json` → `version` (`npm version X.Y.Z --no-git-tag-version`)
-2. Проверить локально: `node scripts/check-version.mjs vX.Y.Z`.
-3. Закоммитить, поставить тег и запушить его:
+2. Check locally: `node scripts/check-version.mjs vX.Y.Z`.
+3. Commit, tag and push the tag:
 
    ```bash
    git tag vX.Y.Z
    git push origin vX.Y.Z
    ```
 
-4. Workflow сначала сверяет версию с тегом (при расхождении падает и пишет, какой файл не совпал), затем `tauri-apps/tauri-action` собирает приложение на трёх ОС и создаёт **черновик** GitHub Release «stlink-rust-ui vX.Y.Z» с установщиками.
-5. Проверить черновик (Releases), дописать заметки и нажать «Publish release».
+4. The workflow first checks the version against the tag (on a mismatch it fails and names the file that differs), then `tauri-apps/tauri-action` builds the app on three OSes and creates a **draft** GitHub Release "stlink-rust-ui vX.Y.Z" with the installers.
+5. Review the draft (Releases), add notes and press "Publish release".
 
-Права `GITHUB_TOKEN`: `contents: write` только у job сборки (ему нужно создать релиз).
+`GITHUB_TOKEN` permissions: `contents: write` only for the build job (it creates the release).
 
-## Подпись
+## Signing
 
-Без секретов:
-- **macOS** — ad-hoc подпись (`bundle.macOS.signingIdentity: "-"` в `src-tauri/tauri.macos.conf.json`). Скачанное приложение не считается «повреждённым», но Gatekeeper предупредит о неизвестном разработчике: первый запуск через правый клик → «Открыть» (или Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть»).
-- **Windows** — установщики без подписи, SmartScreen предупреждает при запуске (см. [windows.md](windows.md)).
+Without secrets:
+- **macOS**: ad-hoc signature (`bundle.macOS.signingIdentity: "-"` in `src-tauri/tauri.macos.conf.json`). A downloaded app is not reported as "damaged", but Gatekeeper warns about an unidentified developer: open it the first time via right-click → "Open" (or System Settings → Privacy & Security → "Open Anyway").
+- **Windows**: unsigned installers, SmartScreen warns on launch (see [windows.md](windows.md)).
 
-Секреты добавляются в Settings → Secrets and variables → Actions → New repository secret. Шаги подписи в `release.yml` включаются, только если секреты заданы.
+Add secrets in Settings → Secrets and variables → Actions → New repository secret. The signing steps in `release.yml` run only when the secrets are set.
 
-### Apple: подпись Developer ID и нотаризация
+### Apple: Developer ID signing and notarization
 
-Нужен Apple Developer Program и сертификат «Developer ID Application».
+Requires the Apple Developer Program and a "Developer ID Application" certificate.
 
-| Секрет | Что |
+| Secret | What |
 |---|---|
-| `APPLE_CERTIFICATE` | Сертификат с ключом, `.p12` в base64: `base64 -i cert.p12 \| pbcopy` |
-| `APPLE_CERTIFICATE_PASSWORD` | Пароль от `.p12` |
-| `APPLE_SIGNING_IDENTITY` | Имя сертификата, например `Developer ID Application: Name (TEAMID)` (`security find-identity -v -p codesigning`) |
-| `APPLE_ID` | Apple ID для нотаризации |
+| `APPLE_CERTIFICATE` | Certificate with its key, `.p12` in base64: `base64 -i cert.p12 \| pbcopy` |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` password |
+| `APPLE_SIGNING_IDENTITY` | Certificate name, e.g. `Developer ID Application: Name (TEAMID)` (`security find-identity -v -p codesigning`) |
+| `APPLE_ID` | Apple ID used for notarization |
 | `APPLE_PASSWORD` | App-specific password (appleid.apple.com → Sign-In and Security → App-Specific Passwords) |
 | `APPLE_TEAM_ID` | Team ID (developer.apple.com → Membership) |
 
-С первыми тремя приложение подписывается Developer ID. Со всеми шестью Tauri ещё и нотаризует его.
+With the first three the app is signed with Developer ID. With all six Tauri also notarizes it.
 
-### Windows: подпись кода
+### Windows: code signing
 
-Нужен сертификат подписи кода (OV/EV) в виде `.pfx`.
+Requires a code signing certificate (OV/EV) as a `.pfx`.
 
-| Секрет | Что |
+| Secret | What |
 |---|---|
-| `WINDOWS_CERTIFICATE` | `.pfx` в base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))` |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Пароль от `.pfx` |
+| `WINDOWS_CERTIFICATE` | `.pfx` in base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))` |
+| `WINDOWS_CERTIFICATE_PASSWORD` | `.pfx` password |
 
-Workflow импортирует сертификат в хранилище раннера и передаёт его отпечаток в `tauri build` (`bundle.windows.certificateThumbprint`, SHA-256, метка времени DigiCert). EV-сертификаты на токене так не работают: для них нужен `signCommand` с облачным сервисом подписи. Это отдельная задача.
+The workflow imports the certificate into the runner's store and passes its thumbprint to `tauri build` (`bundle.windows.certificateThumbprint`, SHA-256, DigiCert timestamp). EV certificates on a hardware token do not work this way: they need a `signCommand` with a cloud signing service. That is a separate task.
 
-## Локально
+## Locally
 
-- macOS universal: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, затем `npm run tauri build -- --target universal-apple-darwin`; результат — в `target/universal-apple-darwin/release/bundle/{macos,dmg}`.
-- Проверка workflow: `actionlint .github/workflows/*.yml` (`brew install actionlint`).
+- macOS universal: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`, then `npm run tauri build -- --target universal-apple-darwin`; output in `target/universal-apple-darwin/release/bundle/{macos,dmg}`.
+- Workflow lint: `actionlint .github/workflows/*.yml` (`brew install actionlint`).

@@ -25,3 +25,6 @@ dist-ssr
 
 # Rust
 /target
+
+# Claude Code local settings
+.claude/

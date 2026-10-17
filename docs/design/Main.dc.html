@@ -106,7 +106,7 @@ body{margin:0}
 </div>
 </div>
 
-<!-- 1 · Нет устройства -->
+<!-- 1 · No device -->
 <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ true }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px">
@@ -130,7 +130,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 1b · Программатор свободен -->
+<!-- 1b · Probe detected, disconnected -->
 <sc-if value="{{isReleased}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px">
@@ -138,7 +138,6 @@ body{margin:0}
 <svg width="52" height="52" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="10" y="18" width="30" height="20" rx="4"/><path d="M40 22h6v12h-6"/><path d="M22 24v8M28 24v8"/></svg>
 </div>
 <h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em">{{t.relTitle}}</h1>
-<p style="margin: 0; max-width: 460px; text-align: center; color: var(--text2); font-size: 13.5px; line-height: 1.5">{{t.relText}}</p>
 <button class="btn btn-primary" style="height: 34px; padding: 0 20px; font-size: 13.5px; margin-top: 6px" onClick="{{connect}}">{{t.connect}}</button>
 <section class="card" style="margin-top: 12px; padding: 6px 16px; width: 380px">
 <div class="kv"><span class="k">{{t.programmer}}</span><span class="v">ST-Link V2 · <span class="mono">0483:3748</span></span></div>
@@ -151,7 +150,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 2 · Устройство -->
+<!-- 2 · Device -->
 <sc-if value="{{isDeviceBase}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 18px 28px">
@@ -235,7 +234,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Подтверждение полного стирания -->
+<!-- Erase-all confirmation -->
 <sc-if value="{{isEraseConfirm}}" hint-placeholder-val="{{ false }}">
 <div class="scrim">
 <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="er-title" style="width: 460px; padding: 22px 24px 18px; gap: 12px">
@@ -252,7 +251,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 3 · Запись: параметры (+ подтверждение поверх) -->
+<!-- 3 · Flash: options (+ confirmation on top) -->
 <sc-if value="{{isWriteForm}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 22px 28px">
@@ -329,7 +328,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Прогресс (запись или полное стирание) -->
+<!-- Progress (flash or erase all) -->
 <sc-if value="{{isProgress}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: 24px 120px">
@@ -366,7 +365,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Готово: запись -->
+<!-- Done: flash -->
 <sc-if value="{{isWriteDone}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px">
@@ -390,7 +389,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Готово: полное стирание -->
+<!-- Done: erase all -->
 <sc-if value="{{isEraseDone}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px">
@@ -414,7 +413,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 3 · Чтение: параметры -->
+<!-- 3 · Read: options -->
 <sc-if value="{{isRead}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 18px; padding: 22px 28px">
@@ -454,7 +453,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 4 · Чтение: прогресс -->
+<!-- 4 · Read: progress -->
 <sc-if value="{{isReadProgress}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px 120px">
@@ -477,7 +476,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- 5 · Чтение: готово -->
+<!-- 5 · Read: done -->
 <sc-if value="{{isReadDone}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px">
@@ -502,7 +501,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Настройки -->
+<!-- Settings -->
 <sc-if value="{{isSettings}}" hint-placeholder-val="{{ false }}">
 <div class="scrim">
 <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="set-title" style="width: 760px; padding: 18px 22px 16px; gap: 14px">
@@ -571,7 +570,7 @@ body{margin:0}
 </div>
 </sc-if>
 
-<!-- Журнал -->
+<!-- Log -->
 <sc-if value="{{isLog}}" hint-placeholder-val="{{ false }}">
 <div class="scrim">
 <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="log-title" style="width: 860px; height: 520px; padding: 16px 0 0">

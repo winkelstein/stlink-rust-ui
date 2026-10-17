@@ -1,43 +1,43 @@
-# stlink-rust-ui на Windows
+# stlink-rust-ui on Windows
 
-USB в приложении идёт через [`nusb`](https://docs.rs/nusb), а на Windows nusb работает **только с устройствами на драйвере WinUSB**. libusb/libusbK, старый драйвер ST `STLinkUSB` и прочие не подходят.
+The app talks to USB through [`nusb`](https://docs.rs/nusb), and on Windows nusb works **only with devices bound to the WinUSB driver**. libusb/libusbK, the old ST `STLinkUSB` driver and others do not work.
 
-## Драйверы
+## Drivers
 
-| Устройство | Что поставить | Как проверить |
+| Device | What to install | How to check |
 |---|---|---|
-| ST-Link V2 / V2-1 / V3 (`0483:3748`, `374B`, `3752`, `374E`, `374F`, `3753`, `3754`) | Драйвер ST [STSW-LINK009](https://www.st.com/en/development-tools/stsw-link009.html). Он же ставится вместе со STM32CubeProgrammer. Это WinUSB с INF от ST | Диспетчер устройств → «Universal Serial Bus devices» → «STM32 STLink». Свойства → Драйвер → «Сведения о драйвере»: `winusb.sys` |
-| STM32 в режиме DFU (`0483:df11`, BOOT0 = 1) | WinUSB через [Zadig](https://zadig.akeo.ie/): Options → List All Devices → «STM32 BOOTLOADER» → WinUSB → Replace Driver | Диспетчер устройств → «Universal Serial Bus devices» → «STM32 BOOTLOADER», драйвер `winusb.sys`. Внимание: STM32CubeProgrammer на этом драйвере DFU не видит, ему нужен драйвер ST «STM32 DFU»; переключение — тем же Zadig или «Откатить драйвер» |
+| ST-Link V2 / V2-1 / V3 (`0483:3748`, `374B`, `3752`, `374E`, `374F`, `3753`, `3754`) | ST driver [STSW-LINK009](https://www.st.com/en/development-tools/stsw-link009.html). STM32CubeProgrammer installs it too. It is WinUSB with an INF from ST | Device Manager → "Universal Serial Bus devices" → "STM32 STLink". Properties → Driver → "Driver Details": `winusb.sys` |
+| STM32 in DFU mode (`0483:df11`, BOOT0 = 1) | WinUSB via [Zadig](https://zadig.akeo.ie/): Options → List All Devices → "STM32 BOOTLOADER" → WinUSB → Replace Driver | Device Manager → "Universal Serial Bus devices" → "STM32 BOOTLOADER", driver `winusb.sys`. Note: STM32CubeProgrammer does not see DFU devices on this driver, it needs ST's "STM32 DFU" driver; switch back with Zadig or "Roll Back Driver" |
 
-У V2-1 и V3 устройство составное (`usbccgp`): WinUSB должен стоять на интерфейсе отладки (MI_00). Mass storage и COM-порт работают на своих стандартных драйверах.
+V2-1 and V3 are composite devices (`usbccgp`): WinUSB must be bound to the debug interface (MI_00). Mass storage and the COM port keep their standard drivers.
 
-Если устройство видно, но драйвер не тот, приложение показывает экран «Нужен драйвер WinUSB» с именем драйвера и ссылками на драйвер ST и Zadig. В журнале при этом есть строка `device driver is not WinUSB` с именем драйвера.
+If the device is visible but has the wrong driver, the app shows the "WinUSB driver needed" screen with the driver name and links to the ST driver and Zadig. The log then contains a `device driver is not WinUSB` line with the driver name.
 
-## Программатор занят
+## Programmer is busy
 
-WinUSB открывает устройство эксклюзивно. Пока ST-Link открыт другой программой (OpenOCD, STM32CubeProgrammer, st-util, отладчик VS Code), приложение показывает «Программатор занят» и кнопку «Повторить». «Отключить» в приложении закрывает устройство, после этого его могут взять другие программы.
+WinUSB opens a device exclusively. While another program holds the ST-Link (OpenOCD, STM32CubeProgrammer, st-util, the VS Code debugger), the app shows "Programmer is busy" with a Retry button. "Disconnect" in the app closes the device so other programs can take it.
 
 ## SmartScreen
 
-Сборки пока не подписаны. При первом запуске установщика Windows показывает «Windows защитила ваш компьютер»: «Подробнее» → «Выполнить в любом случае». Подпись кода описана в [release.md](release.md).
+Builds are not signed yet. On the first launch of the installer Windows shows "Windows protected your PC": "More info" → "Run anyway". Code signing is described in [release.md](release.md).
 
-## Чек-лист ручной проверки
+## Manual test checklist
 
-Стенд: ST-Link (драйвер ST), плата STM32H743, установщик из артефактов CI (`.msi` или `-setup.exe`).
+Setup: ST-Link (ST driver), STM32H743 board, installer from the CI artifacts (`.msi` or `-setup.exe`).
 
-1. **Установка и запуск.** SmartScreen пропускается через «Подробнее». Окно 920×620 с системной рамкой и кнопками Windows. Под рамкой наша полоса со степпером, «Журнал» и «Настройки», без цветных кружков слева. Ничего не обрезано по высоте.
-2. **Hot-plug.** Без программатора экран «Подключите программатор». Вставить ST-Link → «Программатор отключён» с серийником (устройство не открыто). Выдернуть → снова «Подключите программатор».
-3. **Подключение.** «Подключиться» → карточки программатора (версия, напряжение) и МК (STM32H743, UID, RDP 0).
-4. **Запись.** «Записать прошивку» → выбрать `.bin` (диалог Windows) или перетащить файл из проводника в окно → «Стереть и записать» → подтверждение → прогресс → «Прошивка записана и проверена», CRC32.
-5. **Быстрая запись.** Ctrl+R. На кнопках и в подсказках написано Ctrl+R, а не ⌘R.
-6. **Слежение за файлом.** Включить «При изменении файла», пересобрать прошивку (или перезаписать файл через временный файл + rename). Запись запускается один раз через ~1 с; при том же CRC не запускается.
-7. **Чтение.** «Прочитать в файл» → «Весь flash» → путь вида `C:\Users\…\Downloads\…`, со `\` → «Готово» → «Показать в проводнике» открывает проводник с выделенным файлом. «Диапазон» с размером больше flash не даёт нажать «Прочитать».
-8. **Полное стирание.** «Стереть всё» → красное подтверждение → «Банк 1», «Банк 2» → «Flash стёрт». Потом записать прошивку обратно.
-9. **Отключить → OpenOCD.** «Отключить» → `openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; shutdown"` находит Cortex-M7 при открытом приложении → закрыть OpenOCD → «Подключиться» в приложении работает.
-10. **Занят.** Запустить OpenOCD (без `shutdown`) → «Подключиться» → «Программатор занят» → закрыть OpenOCD → «Повторить» работает.
-11. **Обрыв.** Выдернуть кабель во время записи → плашка «Связь потеряна во время записи…», приложение не зависает. Вставить → «Подключиться» → запись проходит.
-12. **Драйвер.** (Если есть второй ST-Link или можно временно поставить libusbK через Zadig.) Экран «Нужен драйвер WinUSB», ссылки открываются в браузере.
-13. **Оформление и язык.** Настройки (Ctrl+,): «Тёмное» → все экраны тёмные, галочки и список частот тёмные. English → все тексты на английском, числа с точкой (`3.28 V`). Esc закрывает настройки.
-14. **Прокрутка и масштаб.** Колёсико мыши и тачпад: окно не прокручивается и не пружинит, журнал прокручивается. Ctrl+колесо, Ctrl+«+»/«−» и щипок не масштабируют.
-15. **Журнал.** Фильтры «Все / Ошибки / USB», «Подробный журнал USB» → TRACE-строки, «Копировать», «Сохранить…» (диалог Windows), «Очистить».
-16. **Лог-файл.** `%LOCALAPPDATA%\com.andrewwinkelstein.stlink-rust-ui\logs\stlink-ui.log` создаётся. Его стоит приложить к отчёту об ошибке.
+1. **Install and launch.** Get past SmartScreen with "More info". A 920×620 window with the system frame and Windows caption buttons. Below the frame, our strip with the stepper, "Log" and "Settings", without the colored dots on the left. Nothing is cut off vertically.
+2. **Hot-plug.** Without a probe: "Connect a programmer". Plug in the ST-Link → "Programmer disconnected" with the serial number (the device is not opened). Unplug → back to "Connect a programmer".
+3. **Connect.** "Connect" → programmer card (version, voltage) and MCU card (STM32H743, UID, RDP 0).
+4. **Flash.** "Flash firmware" → pick a `.bin` (Windows dialog) or drop a file from Explorer onto the window → "Erase and flash" → confirmation → progress → "Firmware flashed and verified", CRC32.
+5. **Quick flash.** Ctrl+R. Buttons and tooltips say Ctrl+R, not ⌘R.
+6. **File watching.** Turn on "When the file changes", rebuild the firmware (or overwrite the file via a temp file + rename). Flashing starts once after ~1 s; it does not start if the CRC is unchanged.
+7. **Read.** "Read to file" → "Entire flash" → path like `C:\Users\…\Downloads\…`, with `\` → "Done" → "Show in Explorer" opens Explorer with the file selected. "Range" with a size larger than flash keeps "Read" disabled.
+8. **Erase all.** "Erase all" → red confirmation → "Bank 1", "Bank 2" → "Flash erased". Then flash the firmware back.
+9. **Disconnect → OpenOCD.** "Disconnect" → `openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c "init; shutdown"` finds the Cortex-M7 while the app is open → close OpenOCD → "Connect" in the app works.
+10. **Busy.** Start OpenOCD (without `shutdown`) → "Connect" → "Programmer is busy" → close OpenOCD → "Retry" works.
+11. **Cable pulled.** Unplug the cable while flashing → banner "The connection was lost while flashing", the app does not hang. Plug it back → "Connect" → flashing works.
+12. **Driver.** (If you have a second ST-Link or can temporarily install libusbK via Zadig.) "WinUSB driver needed" screen, the links open in the browser.
+13. **Appearance and language.** Settings (Ctrl+,): "Dark" → all screens dark, checkboxes and the clock list dark too. Русский → all copy in Russian, numbers with a comma (`3,28 В`). Esc closes Settings.
+14. **Scrolling and zoom.** Mouse wheel and touchpad: the window does not scroll or bounce, the log scrolls. Ctrl+wheel, Ctrl+"+"/"−" and pinch do not zoom.
+15. **Log.** Filters "All / Errors / USB", "Verbose USB log" → TRACE lines, "Copy", "Save…" (Windows dialog), "Clear".
+16. **Log file.** `%LOCALAPPDATA%\com.andrewwinkelstein.stlink-rust-ui\logs\stlink-ui.log` is created. Attach it to bug reports.

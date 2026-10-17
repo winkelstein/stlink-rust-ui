@@ -22,7 +22,8 @@ export function ReleasedScreen() {
   const usb = `${fmtHex16(p.descriptor.vid)}:${fmtHex16(p.descriptor.pid)}`.toLowerCase();
   const blocked = s.blocked?.reason ?? null;
   const title = blocked === "busy" ? t.busyTitle : blocked === "driver" ? t.driverTitle : t.relTitle;
-  const text = blocked === "busy" ? t.busyText(model) : blocked === "driver" ? t.driverText(model) : t.relText(model);
+  // The plain state has no explanation (Main.dc.html); the variants explain what to do.
+  const text = blocked === "busy" ? t.busyText(model) : blocked === "driver" ? t.driverText(model) : null;
   const link = (label: string, url: string) => (
     <button
       type="button"
@@ -64,7 +65,9 @@ export function ReleasedScreen() {
         </div>
         {/* TODO(design): the busy and driver variants are not drawn; same layout, other text. */}
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</h1>
-        <p style={{ margin: 0, maxWidth: 460, textAlign: "center", color: "var(--text2)", fontSize: 13.5, lineHeight: 1.5 }}>{text}</p>
+        {text && (
+          <p style={{ margin: 0, maxWidth: 460, textAlign: "center", color: "var(--text2)", fontSize: 13.5, lineHeight: 1.5 }}>{text}</p>
+        )}
         {blocked === "driver" && (
           <div style={{ display: "flex", gap: 16 }}>
             {link(t.driverStLink, DRIVER_PAGES.stlink)}

@@ -24,8 +24,6 @@ export const ru = {
 
   // released
   relTitle: "Программатор отключён",
-  relText: (model: string) =>
-    `${model} найден. Нажмите «Подключиться», чтобы начать работу. Пока программатор отключён, им могут пользоваться VS Code, OpenOCD или st-flash.`,
   connect: "Подключиться",
   connecting: "Подключение…",
   chipReleased: (model: string) => `${model} · отключён`,

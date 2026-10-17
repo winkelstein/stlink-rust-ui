@@ -19,8 +19,6 @@ export const en: Dict = {
   waiting: "Waiting for a device…",
 
   relTitle: "Programmer disconnected",
-  relText: (model) =>
-    `${model} is detected. Press Connect to start. While it is disconnected, VS Code, OpenOCD or st-flash can use it.`,
   connect: "Connect",
   connecting: "Connecting…",
   chipReleased: (model) => `${model} · disconnected`,

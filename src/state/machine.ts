@@ -19,6 +19,7 @@ import type {
 } from "../backend/types";
 import { fmtHex32 } from "../domain/format";
 import { DEFAULT_QUICK, withChosenFile } from "../domain/quickWrite";
+import { rangeFields } from "./readRange";
 
 export type Screen =
   | "empty"
@@ -312,7 +313,9 @@ export function reducer(s: AppState, a: Action): AppState {
         quick?.file && !s.writeForm.file
           ? { ...s.writeForm, file: quick.file, addrText: fmtHex32(quick.addr) }
           : s.writeForm;
-      return { ...s, identifying: false, session: a.session, quick, armed: null, writeForm };
+      const g = a.session.target.geometry;
+      const readForm = g ? { ...s.readForm, ...rangeFields(s.readForm.range, g) } : s.readForm;
+      return { ...s, identifying: false, session: a.session, quick, armed: null, writeForm, readForm };
     }
 
     case "identifyFailed":

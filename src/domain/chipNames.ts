@@ -1,7 +1,7 @@
 // Display names for chips. `dev_type` from the chip table names a whole line
 // (`STM32H74x_H75x`); the UI shows a friendlier name where we know one.
 
-import type { CoreInfo, TargetInfo } from "../backend/types";
+import type { CoreInfo, ProbeModel, TargetInfo } from "../backend/types";
 
 const NAMES: Record<number, { full: string; short: string }> = {
   0x450: { full: "STM32H743 / H753", short: "STM32H743" },
@@ -28,4 +28,15 @@ const CORE_NAMES: Record<CoreInfo["core"], string> = {
 /** `Cortex-M7 r1p1`. */
 export function coreName(c: CoreInfo): string {
   return `${CORE_NAMES[c.core]} r${c.revision[0]}p${c.revision[1]}`;
+}
+
+const PROBE_NAMES: Record<ProbeModel, string> = {
+  V2: "ST-Link V2",
+  V2_1: "ST-Link V2-1",
+  V3: "ST-Link V3",
+};
+
+/** `usb::ProbeModel` `Display`. */
+export function probeModelName(m: ProbeModel): string {
+  return PROBE_NAMES[m];
 }

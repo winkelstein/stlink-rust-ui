@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "./Button";
 import { WarnIcon } from "./Icons";
 
@@ -21,9 +21,10 @@ export function ConfirmSheet({ title, children, confirmLabel, onConfirm, onCance
     return () => prev?.focus?.();
   }, []);
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
+      e.stopPropagation();
       onCancel();
     } else if (e.key === "Tab") {
       const items = dialog.current?.querySelectorAll<HTMLElement>("button:not(:disabled)");

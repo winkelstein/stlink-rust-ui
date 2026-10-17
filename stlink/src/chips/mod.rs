@@ -10,6 +10,10 @@ use tracing::warn;
 
 use crate::arm::CoreType;
 
+mod layouts;
+
+pub use layouts::{BankMode, BankModeRegister, LayoutTemplate, bank_mode_register, layouts};
+
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/chip_files.rs"));
 }
@@ -111,16 +115,49 @@ pub fn idcode_addresses(core: CoreType) -> &'static [u32] {
     }
 }
 
-/// Register holding the RDP byte, by `flash_type`: `(address, bit shift)`.
-/// Read only — option bytes are never written by this library.
-const RDP_REGISTERS: &[(&str, u32, u8)] = &[
-    ("H7", 0x5200_201C, 8),    // FLASH_OPTSR_CUR (RM0433)
-    ("F2_F4", 0x4002_3C14, 8), // FLASH_OPTCR (RM0090)
-    ("F7", 0x4002_3C14, 8),    // FLASH_OPTCR (RM0385)
-    ("L4", 0x4002_2020, 0),    // FLASH_OPTR (RM0351)
-    ("G4", 0x4002_2020, 0),    // FLASH_OPTR (RM0440)
-    ("G0", 0x4002_2020, 0),    // FLASH_OPTR (RM0444)
-    ("WB_WL", 0x5800_4020, 0), // FLASH_OPTR (RM0434, RM0461)
+/// How the read-out protection level is stored in its register.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RdpEncoding {
+    /// An RDP byte at `shift`: `0xAA` level 0, `0xCC` level 2, else level 1.
+    Byte { shift: u8 },
+    /// F1 `FLASH_OBR.RDPRT` (bit 1): set = level 1 (F1 has no level 2).
+    F1Obr,
+    /// F0/F3 `FLASH_OBR.RDPRT[1:0]` (bits 2:1): 0 = level 0, 3 = level 2, else level 1.
+    F0F3Obr,
+}
+
+/// Register holding the read-out protection level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RdpRegister {
+    pub addr: u32,
+    pub encoding: RdpEncoding,
+}
+
+/// RDP register by `flash_type`. Read only — option bytes are never written
+/// by this library.
+const RDP_REGISTERS: &[(&str, u32, RdpEncoding)] = &[
+    ("H7", 0x5200_201C, RdpEncoding::Byte { shift: 8 }), // FLASH_OPTSR_CUR (RM0433)
+    ("F2_F4", 0x4002_3C14, RdpEncoding::Byte { shift: 8 }), // FLASH_OPTCR (RM0090)
+    ("F7", 0x4002_3C14, RdpEncoding::Byte { shift: 8 }), // FLASH_OPTCR (RM0385)
+    ("L4", 0x4002_2020, RdpEncoding::Byte { shift: 0 }), // FLASH_OPTR (RM0351)
+    ("G4", 0x4002_2020, RdpEncoding::Byte { shift: 0 }), // FLASH_OPTR (RM0440)
+    ("G0", 0x4002_2020, RdpEncoding::Byte { shift: 0 }), // FLASH_OPTR (RM0444)
+    ("WB_WL", 0x5800_4020, RdpEncoding::Byte { shift: 0 }), // FLASH_OPTR (RM0434, RM0461)
+    ("F0_F1_F3", 0x4002_201C, RdpEncoding::F0F3Obr),     // FLASH_OBR (RM0091, RM0316); F1 below
+    ("F1_XL", 0x4002_201C, RdpEncoding::F1Obr),          // FLASH_OBR (RM0008)
+];
+
+/// F1 chip ids (flash type `F0_F1_F3` covers F0, F1 and F3; their FLASH_OBR
+/// RDP bits differ).
+const F1_CHIP_IDS: &[u16] = &[0x410, 0x412, 0x414, 0x418, 0x420, 0x428, 0x430];
+
+/// CPUID of the original ST parts, by chip id. Clones (GD32, CKS32, APM32)
+/// report the same chip id with another core revision.
+const ORIGINAL_CPUID: &[(&[u16], u32)] = &[
+    // Cortex-M3 r1p1
+    (F1_CHIP_IDS, 0x411F_C231),
+    // Cortex-M0 r0p0
+    (&[0x440, 0x442, 0x444, 0x445, 0x448], 0x410C_C200),
 ];
 
 /// Where DBGMCU_CR is and which bits keep debug alive in Sleep/Stop/Standby.
@@ -153,12 +190,27 @@ pub fn debug_ap_idcode_addresses() -> &'static [(u8, u32)] {
 }
 
 impl ChipDescriptor {
-    /// RDP register `(address, shift)`, if known for this family.
-    pub fn rdp_register(&self) -> Option<(u32, u8)> {
+    /// RDP register, if known for this family.
+    pub fn rdp_register(&self) -> Option<RdpRegister> {
         RDP_REGISTERS
             .iter()
             .find(|(t, _, _)| *t == self.flash_type)
-            .map(|&(_, addr, shift)| (addr, shift))
+            .map(|&(_, addr, encoding)| RdpRegister {
+                addr,
+                encoding: if F1_CHIP_IDS.contains(&self.chip_id) {
+                    RdpEncoding::F1Obr
+                } else {
+                    encoding
+                },
+            })
+    }
+
+    /// CPUID of the original ST part, if known (to spot clones).
+    pub fn original_cpuid(&self) -> Option<u32> {
+        ORIGINAL_CPUID
+            .iter()
+            .find(|(ids, _)| ids.contains(&self.chip_id))
+            .map(|&(_, cpuid)| cpuid)
     }
 
     /// DBGMCU_CR settings for debugging in low-power modes, if known.
@@ -339,7 +391,13 @@ mod tests {
     #[test]
     fn family_registers() {
         let h7 = find(0x450);
-        assert_eq!(h7.and_then(|c| c.rdp_register()), Some((0x5200_201C, 8)));
+        assert_eq!(
+            h7.and_then(|c| c.rdp_register()),
+            Some(RdpRegister {
+                addr: 0x5200_201C,
+                encoding: RdpEncoding::Byte { shift: 8 }
+            })
+        );
         assert_eq!(
             h7.and_then(|c| c.dbgmcu_low_power()),
             Some(DbgmcuLowPower {
@@ -349,7 +407,21 @@ mod tests {
             })
         );
         let f427 = find(0x419);
-        assert_eq!(f427.and_then(|c| c.rdp_register()), Some((0x4002_3C14, 8)));
+        assert_eq!(
+            f427.and_then(|c| c.rdp_register()).map(|r| r.addr),
+            Some(0x4002_3C14)
+        );
+        // F0_F1_F3 covers three lines with two FLASH_OBR layouts.
+        let obr = |id| find(id).and_then(|c| c.rdp_register()).map(|r| r.encoding);
+        assert_eq!(obr(0x410), Some(RdpEncoding::F1Obr), "F103");
+        assert_eq!(obr(0x440), Some(RdpEncoding::F0F3Obr), "F05x");
+        assert_eq!(obr(0x422), Some(RdpEncoding::F0F3Obr), "F30x");
+        assert_eq!(obr(0x430), Some(RdpEncoding::F1Obr), "F1 XL");
+        assert_eq!(
+            find(0x410).and_then(|c| c.original_cpuid()),
+            Some(0x411F_C231)
+        );
+        assert_eq!(find(0x450).and_then(|c| c.original_cpuid()), None);
         // Every flash_type in the tables exists in the chip table.
         for t in RDP_REGISTERS
             .iter()

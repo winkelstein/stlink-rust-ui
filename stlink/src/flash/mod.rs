@@ -1,66 +1,98 @@
-//! Flash operations: reading (dump), protection check, erase/program/verify.
+//! Flash operations: reading (dump), protection check, erase/program/verify,
+//! mass erase. Families: F0/F1/F3 (pages), F2/F4/F7 (sectors), G4 (pages),
+//! H74x/H75x/H72x/H73x (sectors). Drivers talk to the target through the
+//! [`mem::Memory`] trait, so the sequences are tested against a register
+//! model (`fake`) without hardware.
 
+mod ctrl;
+#[cfg(test)]
+mod driver_tests;
+mod f0f1;
+mod f4;
+#[cfg(test)]
+mod fake;
+mod g4;
 mod geometry;
 mod h7;
+mod layout;
+pub(crate) mod mem;
+mod ops;
 
 use std::ops::ControlFlow;
 
 use tracing::{debug, info, warn};
 
-use crate::chips::{self, ChipDescriptor};
+use crate::chips::{self, ChipDescriptor, RdpEncoding};
 use crate::probe::StLink;
 use crate::target::TargetInfo;
 use crate::{Error, Result};
 
-pub use geometry::{FlashGeometry, Sector, WritePlan};
+pub use geometry::{EraseUnit, FlashBank, FlashGeometry, Sector, SectorRun, WritePlan};
 
-/// Bytes programmed between progress callbacks.
-const PROGRAM_BLOCK: usize = 4 * 1024;
+use mem::Memory;
 
 /// Per-family flash controller.
 pub(crate) trait FlashDriver {
-    fn geometry(&self) -> FlashGeometry;
-    fn unlock(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
-    fn lock(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
-    fn erase_sector(&mut self, link: &mut StLink, sector: &Sector) -> Result<()>;
+    fn geometry(&self) -> &FlashGeometry;
+    fn unlock(&mut self, m: &mut dyn Memory, bank: u8) -> Result<()>;
+    fn lock(&mut self, m: &mut dyn Memory, bank: u8) -> Result<()>;
+    /// Erase one page or sector.
+    fn erase_sector(&mut self, m: &mut dyn Memory, sector: &Sector) -> Result<()>;
     /// Erase the whole bank (user flash only, never option bytes).
-    fn erase_bank(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
+    fn erase_bank(&mut self, m: &mut dyn Memory, bank: u8) -> Result<()>;
     /// Program `data` at `addr`: aligned to the write granularity, one bank.
-    fn program(&mut self, link: &mut StLink, addr: u32, data: &[u8]) -> Result<()>;
+    fn program(&mut self, m: &mut dyn Memory, addr: u32, data: &[u8]) -> Result<()>;
 }
 
-fn driver_for(chip: &ChipDescriptor, flash_size: u32) -> Result<Box<dyn FlashDriver>> {
-    match chip.flash_type.as_str() {
+/// The driver of a family, with its geometry. `voltage` (target, volts)
+/// picks the F2/F4/F7 programming parallelism.
+fn driver_for(
+    chip: &ChipDescriptor,
+    flash_size: u32,
+    dual_bank: Option<bool>,
+    voltage: Option<f32>,
+) -> Result<Box<dyn FlashDriver>> {
+    let build = |unit, granularity| layout::build(chip, flash_size, dual_bank, unit, granularity);
+    Ok(match chip.flash_type.as_str() {
         // H74x/H75x and H72x/H73x: uniform 128 KiB sectors (not H7Ax/H7Bx).
-        "H7" if chip.flash_pagesize == 128 * 1024 => Ok(Box::new(h7::H7Flash::new(
-            flash_size,
-            chip.flash_pagesize,
-            chip.dual_bank,
-        ))),
-        _ => Err(Error::Unsupported("flash programming for this chip family")),
-    }
+        "H7" if chip.flash_pagesize == 128 * 1024 => {
+            Box::new(h7::H7Flash::new(build(EraseUnit::Sector, 32)?))
+        }
+        "F0_F1_F3" | "F1_XL" => Box::new(f0f1::F0F1Flash::new(build(EraseUnit::Page, 2)?)),
+        "F2_F4" | "F7" => {
+            let psize = f4::Psize::for_voltage(voltage);
+            Box::new(f4::SectorFlash::new(
+                build(EraseUnit::Sector, psize.granularity())?,
+                psize,
+            ))
+        }
+        "G4" => Box::new(g4::G4Flash::new(build(EraseUnit::Page, 8)?)),
+        _ => return Err(Error::Unsupported("flash programming for this chip family")),
+    })
 }
 
-fn target_driver(target: &TargetInfo) -> Result<Box<dyn FlashDriver>> {
+fn target_driver(target: &TargetInfo, voltage: Option<f32>) -> Result<Box<dyn FlashDriver>> {
     let chip = target
         .chip
         .ok_or(Error::Unsupported("flash programming for an unknown chip"))?;
     let flash_size = target.flash_size.ok_or(Error::Unsupported(
         "flash programming without a known flash size",
     ))?;
-    driver_for(chip, flash_size)
+    driver_for(chip, flash_size, target.dual_bank, voltage)
 }
 
 /// Flash layout of a supported target; `Unsupported` if there is no flash
 /// driver for the chip (writing is not possible then).
 pub fn geometry(target: &TargetInfo) -> Result<FlashGeometry> {
-    Ok(target_driver(target)?.geometry())
+    Ok(target_driver(target, None)?.geometry().clone())
 }
 
-/// Validate a write and list the sectors it will erase, without touching the
-/// target (e.g. for a confirmation dialog).
+/// Validate a write and list the pages/sectors it will erase, without
+/// touching the target (e.g. for a confirmation dialog).
 pub fn plan_write(target: &TargetInfo, addr: u32, len: usize) -> Result<WritePlan> {
-    target_driver(target)?.geometry().plan_write(addr, len)
+    target_driver(target, None)?
+        .geometry()
+        .plan_write(addr, len)
 }
 
 /// Bytes to read for a dump at `addr`: `size` if given, otherwise up to the
@@ -88,9 +120,6 @@ pub fn read_len(target: &TargetInfo, addr: u32, size: Option<u32>) -> Result<usi
     }
     usize::try_from(len).map_err(|_| Error::InvalidArgument("size too large"))
 }
-
-/// Bytes read between progress callbacks.
-const READ_BLOCK: usize = 16 * 1024;
 
 /// Stage of a long operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +158,20 @@ impl RdpLevel {
             _ => RdpLevel::Level1,
         }
     }
+
+    /// Decode the protection register as stored by this family.
+    pub fn decode(reg: u32, encoding: RdpEncoding) -> Self {
+        match encoding {
+            RdpEncoding::Byte { shift } => Self::from_byte((reg >> shift) as u8),
+            RdpEncoding::F1Obr if reg & (1 << 1) != 0 => RdpLevel::Level1,
+            RdpEncoding::F1Obr => RdpLevel::Level0,
+            RdpEncoding::F0F3Obr => match (reg >> 1) & 0b11 {
+                0 => RdpLevel::Level0,
+                3 => RdpLevel::Level2,
+                _ => RdpLevel::Level1,
+            },
+        }
+    }
 }
 
 impl StLink {
@@ -156,11 +199,6 @@ impl StLink {
         len: usize,
         mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<Vec<u8>> {
-        if u64::from(addr) + len as u64 > 1 << 32 {
-            return Err(Error::InvalidArgument(
-                "range past the end of address space",
-            ));
-        }
         let total = len as u64;
         let mut out = Vec::with_capacity(len);
         let report = |done: usize, f: &mut dyn FnMut(Progress) -> ControlFlow<()>| {
@@ -174,7 +212,7 @@ impl StLink {
             return Err(Error::Cancelled);
         }
         while out.len() < len {
-            let n = (len - out.len()).min(READ_BLOCK);
+            let n = (len - out.len()).min(ops::READ_BLOCK);
             let block = self.read_memory(addr + out.len() as u32, n)?;
             out.extend_from_slice(&block);
             if report(out.len(), &mut on_progress).is_break() {
@@ -185,7 +223,17 @@ impl StLink {
         Ok(out)
     }
 
-    /// Erase the touched sectors, program `data` at `addr`, optionally verify.
+    /// The driver for `target`, with the parallelism for the current target
+    /// voltage (F2/F4/F7).
+    fn driver(&mut self, target: &TargetInfo) -> Result<Box<dyn FlashDriver>> {
+        let voltage = match target.chip.map(|c| c.flash_type.as_str()) {
+            Some("F2_F4" | "F7") => self.target_voltage().ok().flatten(),
+            _ => None,
+        };
+        target_driver(target, voltage)
+    }
+
+    /// Erase the touched pages/sectors, program `data` at `addr`, optionally verify.
     ///
     /// The address/size are validated and RDP is checked before anything is
     /// erased. The core is halted and stays halted; the flash is locked again
@@ -198,132 +246,30 @@ impl StLink {
         verify: bool,
         mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<()> {
-        let mut driver = target_driver(target)?;
-        let geometry = driver.geometry();
-        let plan = geometry.plan_write(addr, data.len())?;
+        let mut driver = self.driver(target)?;
+        let plan = driver.geometry().plan_write(addr, data.len())?;
         if let Some(chip) = target.chip {
             self.ensure_unprotected(chip)?;
         }
-        let image = geometry::pad(data, plan.padded_len as usize, geometry.erased_value);
-        info!(
-            "write 0x{addr:08X}..0x{:08X}, {} sector(s)",
-            u64::from(addr) + u64::from(plan.padded_len),
-            plan.sectors.len()
+        let image = geometry::pad(
+            data,
+            plan.padded_len as usize,
+            driver.geometry().erased_value,
         );
-
-        self.halt()?;
-        let mut banks: Vec<u8> = plan.sectors.iter().map(|s| s.bank).collect();
-        banks.dedup();
-        let result = (|| {
-            for &bank in &banks {
-                driver.unlock(self, bank)?;
-            }
-            self.erase_and_program(driver.as_mut(), &plan, &image, &mut on_progress)
-        })();
-        for &bank in &banks {
-            if let Err(e) = driver.lock(self, bank) {
-                warn!("cannot lock flash bank {}: {e}", bank + 1);
-            }
-        }
-        result?;
-
-        if verify {
-            self.verify_flash(addr, &image, &mut on_progress)?;
-        }
-        Ok(())
-    }
-
-    fn erase_and_program(
-        &mut self,
-        driver: &mut dyn FlashDriver,
-        plan: &WritePlan,
-        image: &[u8],
-        on_progress: &mut dyn FnMut(Progress) -> ControlFlow<()>,
-    ) -> Result<()> {
-        let geometry = driver.geometry();
-        let step =
-            |stage, done: usize, total: usize, f: &mut dyn FnMut(Progress) -> ControlFlow<()>| {
-                let p = Progress {
-                    stage,
-                    done: done as u64,
-                    total: total as u64,
-                };
-                if f(p).is_break() {
-                    Err(Error::Cancelled)
-                } else {
-                    Ok(())
-                }
-            };
-
-        let n = plan.sectors.len();
-        step(Stage::Erasing, 0, n, on_progress)?;
-        for (i, sector) in plan.sectors.iter().enumerate() {
-            debug!(
-                "erase bank {} sector {} @0x{:08X}",
-                sector.bank + 1,
-                sector.index,
-                sector.addr
-            );
-            driver.erase_sector(self, sector)?;
-            step(Stage::Erasing, i + 1, n, on_progress)?;
-        }
-
-        let total = image.len();
-        step(Stage::Programming, 0, total, on_progress)?;
-        let mut done = 0;
-        while done < total {
-            let a = plan.addr + done as u32;
-            // Never cross a bank boundary within one program call.
-            let bank_end =
-                geometry.base + (u32::from(geometry.bank_of(a)) + 1) * geometry.bank_size;
-            let n = (total - done)
-                .min(PROGRAM_BLOCK)
-                .min((bank_end - a) as usize);
-            driver.program(self, a, &image[done..done + n])?;
-            done += n;
-            step(Stage::Programming, done, total, on_progress)?;
-        }
-        Ok(())
-    }
-
-    fn verify_flash(
-        &mut self,
-        addr: u32,
-        image: &[u8],
-        on_progress: &mut dyn FnMut(Progress) -> ControlFlow<()>,
-    ) -> Result<()> {
-        let total = image.len();
-        let start = Progress {
-            stage: Stage::Verifying,
-            done: 0,
-            total: total as u64,
-        };
-        if on_progress(start).is_break() {
-            return Err(Error::Cancelled);
-        }
-        let mut done = 0;
-        while done < total {
-            let n = (total - done).min(READ_BLOCK);
-            let a = addr + done as u32;
-            let got = self.read_memory(a, n)?;
-            if let Some(i) = got
-                .iter()
-                .zip(&image[done..done + n])
-                .position(|(g, w)| g != w)
-            {
-                return Err(Error::Verify { addr: a + i as u32 });
-            }
-            done += n;
-            let p = Progress {
-                stage: Stage::Verifying,
-                done: done as u64,
-                total: total as u64,
-            };
-            if on_progress(p).is_break() {
-                return Err(Error::Cancelled);
-            }
-        }
-        Ok(())
+        info!(
+            "write 0x{addr:08X}..0x{:08X}, {} {}(s)",
+            u64::from(addr) + u64::from(plan.padded_len),
+            plan.sectors.len(),
+            unit_name(driver.geometry().unit)
+        );
+        ops::write(
+            self,
+            driver.as_mut(),
+            &plan,
+            &image,
+            verify,
+            &mut on_progress,
+        )
     }
 
     /// Erase the whole flash, bank by bank (progress: `Erasing`, done/total in
@@ -334,22 +280,12 @@ impl StLink {
         target: &TargetInfo,
         mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<()> {
-        let mut driver = target_driver(target)?;
-        let banks = bank_count(&driver.geometry());
+        let mut driver = self.driver(target)?;
         if let Some(chip) = target.chip {
             self.ensure_unprotected(chip)?;
         }
-        info!("mass erase: {banks} bank(s)");
-        self.halt()?;
-        erase_banks(banks, &mut on_progress, |bank| {
-            driver.unlock(self, bank)?;
-            let r = driver.erase_bank(self, bank);
-            if let Err(e) = driver.lock(self, bank) {
-                warn!("cannot lock flash bank {}: {e}", bank + 1);
-            }
-            debug!("bank {} erased", bank + 1);
-            r
-        })
+        info!("mass erase: {} bank(s)", driver.geometry().bank_count());
+        ops::mass_erase(self, driver.as_mut(), &mut on_progress)
     }
 
     /// `FlashProtected` unless RDP is level 0 (or unknown for this family).
@@ -366,45 +302,25 @@ impl StLink {
     /// Current RDP level; `None` if the register is unknown for this family.
     /// Read only — option bytes are never modified.
     pub fn read_protection(&mut self, chip: &ChipDescriptor) -> Result<Option<RdpLevel>> {
-        let Some((addr, shift)) = chip.rdp_register() else {
+        let Some(reg) = chip.rdp_register() else {
             return Ok(None);
         };
-        let reg = self.read_u32(addr)?;
-        let level = RdpLevel::from_byte((reg >> shift) as u8);
-        debug!("RDP register 0x{addr:08X} = 0x{reg:08X} → {level:?}");
+        let value = self.read_u32(reg.addr)?;
+        let level = RdpLevel::decode(value, reg.encoding);
+        debug!(
+            "RDP register 0x{:08X} = 0x{value:08X} → {level:?}",
+            reg.addr
+        );
         Ok(Some(level))
     }
 }
 
-fn bank_count(g: &FlashGeometry) -> u8 {
-    (g.size / g.bank_size.max(1)).clamp(1, u32::from(u8::MAX)) as u8
-}
-
-/// Erase banks `0..banks` in order, reporting progress before the first and
-/// after each bank; a `Break` stops before the next bank.
-fn erase_banks(
-    banks: u8,
-    on_progress: &mut dyn FnMut(Progress) -> ControlFlow<()>,
-    mut erase: impl FnMut(u8) -> Result<()>,
-) -> Result<()> {
-    let report = |done: u8, f: &mut dyn FnMut(Progress) -> ControlFlow<()>| {
-        let p = Progress {
-            stage: Stage::Erasing,
-            done: u64::from(done),
-            total: u64::from(banks),
-        };
-        if f(p).is_break() {
-            Err(Error::Cancelled)
-        } else {
-            Ok(())
-        }
-    };
-    report(0, on_progress)?;
-    for bank in 0..banks {
-        erase(bank)?;
-        report(bank + 1, on_progress)?;
+/// `page` / `sector`, for logs.
+pub fn unit_name(unit: EraseUnit) -> &'static str {
+    match unit {
+        EraseUnit::Page => "page",
+        EraseUnit::Sector => "sector",
     }
-    Ok(())
 }
 
 /// CRC-32 (IEEE 802.3, as zlib/`crc32` tools).
@@ -447,6 +363,7 @@ mod tests {
             idcode_raw: u32::from(chip_id),
             flash_size,
             uid: None,
+            dual_bank: None,
         }
     }
 
@@ -535,7 +452,7 @@ mod tests {
     fn erase_banks_in_order_with_progress() {
         let mut erased = Vec::new();
         let mut seen = Vec::new();
-        let r = erase_banks(
+        let r = ops::erase_banks(
             2,
             &mut |p| {
                 seen.push((p.done, p.total));
@@ -554,7 +471,7 @@ mod tests {
     #[test]
     fn erase_banks_cancel_between_banks() {
         let mut erased = Vec::new();
-        let r = erase_banks(
+        let r = ops::erase_banks(
             2,
             &mut |p| {
                 if p.done == 1 {
@@ -575,7 +492,7 @@ mod tests {
     #[test]
     fn erase_banks_stops_on_error() {
         let mut calls = 0;
-        let r = erase_banks(2, &mut |_| ControlFlow::Continue(()), |_| {
+        let r = ops::erase_banks(2, &mut |_| ControlFlow::Continue(()), |_| {
             calls += 1;
             Err(Error::FlashOperation { status: 0x20000 })
         });
@@ -585,21 +502,42 @@ mod tests {
 
     #[test]
     fn bank_count_from_geometry() {
-        let g = FlashGeometry {
-            base: 0x0800_0000,
-            size: 2 << 20,
-            bank_size: 1 << 20,
-            sector_size: 128 << 10,
-            write_granularity: 32,
-            erased_value: 0xFF,
-        };
-        assert_eq!(bank_count(&g), 2);
+        let two = FlashGeometry::uniform(0x0800_0000, 2 << 20, 2, 128 << 10, EraseUnit::Sector, 32);
+        assert_eq!(two.bank_count(), 2);
+        let one = FlashGeometry::uniform(0x0800_0000, 2 << 20, 1, 128 << 10, EraseUnit::Sector, 32);
+        assert_eq!(one.bank_count(), 1);
+    }
+
+    #[test]
+    fn rdp_decoding_per_family() {
+        let byte = RdpEncoding::Byte { shift: 8 };
+        assert_eq!(RdpLevel::decode(0x0FFF_AAED, byte), RdpLevel::Level0);
+        assert_eq!(RdpLevel::decode(0x0000_CC00, byte), RdpLevel::Level2);
+        assert_eq!(RdpLevel::decode(0x0000_BB00, byte), RdpLevel::Level1);
         assert_eq!(
-            bank_count(&FlashGeometry {
-                bank_size: 2 << 20,
-                ..g
-            }),
-            1
+            RdpLevel::decode(0x03FF_FFFC, RdpEncoding::F1Obr),
+            RdpLevel::Level0
+        );
+        assert_eq!(
+            RdpLevel::decode(0x0000_0002, RdpEncoding::F1Obr),
+            RdpLevel::Level1
+        );
+        // F1 bit 2 is WDG_SW, not part of RDP.
+        assert_eq!(
+            RdpLevel::decode(0x0000_0004, RdpEncoding::F1Obr),
+            RdpLevel::Level0
+        );
+        assert_eq!(
+            RdpLevel::decode(0b000, RdpEncoding::F0F3Obr),
+            RdpLevel::Level0
+        );
+        assert_eq!(
+            RdpLevel::decode(0b010, RdpEncoding::F0F3Obr),
+            RdpLevel::Level1
+        );
+        assert_eq!(
+            RdpLevel::decode(0b110, RdpEncoding::F0F3Obr),
+            RdpLevel::Level2
         );
     }
 

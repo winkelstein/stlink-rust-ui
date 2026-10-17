@@ -96,6 +96,13 @@ fn print_target(t: &TargetInfo) {
         t.flash_size.unwrap_or(0)
     );
     println!("  sram:       {sram}");
+    if let Some(c) = t.chip {
+        println!("  flash-type: {}", c.flash_type);
+    }
+    match stlink::flash::geometry(t) {
+        Ok(g) => println!("  layout:     {}", g.describe()),
+        Err(e) => println!("  layout:     - ({e})"),
+    }
     println!("  chipid:     0x{:03x}", t.chip_id);
     println!("  dev-type:   {dev_type}");
     println!("  rev-id:     0x{:04x}", t.rev_id());

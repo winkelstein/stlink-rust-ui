@@ -1,0 +1,58 @@
+# Flash layouts the stlink .chip files do not describe: non-uniform sectors,
+# several banks, and bank modes chosen by option bytes.
+#
+# Layout rows:
+#   chip_id  mode  bank1_runs [| bank2_runs]
+#   runs: <count>x<KiB>, e.g. `4x16 1x64 7x128` = 4 × 16 KiB, 1 × 64 KiB, 7 × 128 KiB
+#   mode: single  one bank, cut to the flash size
+#         dual    two equal banks, each cut to half the flash size
+#         fill    banks filled in order up to the flash size (F1 XL)
+#   A row is a template for the largest part; smaller parts use its first
+#   units (F401xC, 256 KiB: 4x16 1x64 1x128). If the chosen mode does not fit
+#   the flash size, the other mode of the same chip is used (F42x 2 MiB parts
+#   are always dual bank).
+#
+# Bank mode rows (option bytes are only read, never written):
+#   bankmode  chip_id  register  bit  dual_when (set | clear)
+#
+# Chips with no row use uniform units of `flash_pagesize` in one bank (or two
+# equal banks with the `dualbank` flag: H74x/H75x).
+#
+# Sources: RM0033 (F2), RM0090 (F405/F407/F42x/F43x), RM0368 (F401),
+# RM0383 (F411), RM0390 (F446), RM0401 (F410), RM0402 (F412), RM0430 (F413),
+# RM0386 (F469), RM0385 (F74x), RM0410 (F76x), RM0431 (F72x), RM0008 (F1 XL),
+# RM0440 (G4).
+
+# F2 / F4
+0x411  single  4x16 1x64 7x128
+0x413  single  4x16 1x64 7x128
+0x419  single  4x16 1x64 7x128
+0x419  dual    4x16 1x64 7x128 | 4x16 1x64 7x128
+0x421  single  4x16 1x64 3x128
+0x423  single  4x16 1x64 7x128
+0x431  single  4x16 1x64 7x128
+0x433  single  4x16 1x64 7x128
+0x434  single  4x16 1x64 7x128
+0x434  dual    4x16 1x64 7x128 | 4x16 1x64 7x128
+0x441  single  4x16 1x64 7x128
+0x458  single  4x16 1x64
+0x463  single  4x16 1x64 11x128
+
+# F7
+0x449  single  4x32 1x128 3x256
+0x451  single  4x32 1x128 7x256
+0x451  dual    4x16 1x64 7x128 | 4x16 1x64 7x128
+0x452  single  4x16 1x64 3x128
+
+# F1 XL-density: bank 1 is the first 512 KiB, bank 2 the rest (2 KiB pages)
+0x430  fill    256x2 | 256x2
+
+# G4: G47x/G48x single bank uses 4 KiB pages, dual bank 2 KiB pages
+0x469  single  128x4
+0x469  dual    128x2 | 128x2
+
+# Bank modes
+bankmode  0x419  0x40023C14  30  set     # F42x/F43x FLASH_OPTCR.DB1M (1 MiB parts)
+bankmode  0x434  0x40023C14  30  set     # F469/F479 FLASH_OPTCR.DB1M
+bankmode  0x451  0x40023C14  29  clear   # F76x/F77x FLASH_OPTCR.nDBANK
+bankmode  0x469  0x40022020  22  set     # G47x/G48x FLASH_OPTR.DBANK

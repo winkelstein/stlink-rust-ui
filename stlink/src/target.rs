@@ -20,6 +20,9 @@ pub struct TargetInfo {
     /// Flash size in bytes, if the chip is known.
     pub flash_size: Option<u32>,
     pub uid: Option<[u8; 12]>,
+    /// Bank mode from the option bytes (read only), for chips where it
+    /// changes the layout (F42x/F43x DB1M, F76x nDBANK, G47x DBANK).
+    pub dual_bank: Option<bool>,
 }
 
 impl TargetInfo {
@@ -62,7 +65,30 @@ impl StLink {
 
         let mut flash_size = None;
         let mut uid = None;
+        let mut dual_bank = None;
         if let Some(chip) = chip {
+            if let Some(cpuid) = chip.original_cpuid()
+                && cpuid != core.cpuid
+            {
+                warn!(
+                    "CPUID 0x{:08X} differs from the original {} (0x{cpuid:08X}): \
+                     probably a clone (GD32, CKS32, APM32); flash timing may differ",
+                    core.cpuid, chip.dev_type
+                );
+            }
+            if let Some(reg) = chips::bank_mode_register(chip.chip_id) {
+                match self.read_u32(reg.addr) {
+                    Ok(v) => {
+                        dual_bank = Some(reg.is_dual(v));
+                        debug!(
+                            "bank mode register 0x{:08X} = 0x{v:08X}, dual bank: {}",
+                            reg.addr,
+                            reg.is_dual(v)
+                        );
+                    }
+                    Err(e) => warn!("bank mode register 0x{:08X}: {e}", reg.addr),
+                }
+            }
             // Not fatal: identification is still useful without these.
             match self.read_u16(chip.flash_size_reg) {
                 Ok(reg) => flash_size = Some(chip.flash_size_quirk.flash_size(reg)),
@@ -82,6 +108,7 @@ impl StLink {
             idcode_raw,
             flash_size,
             uid,
+            dual_bank,
         })
     }
 

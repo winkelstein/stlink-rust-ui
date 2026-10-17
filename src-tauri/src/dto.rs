@@ -2,7 +2,7 @@
 //! `src/backend/types.ts` (camelCase).
 
 use serde::{Deserialize, Serialize};
-use stlink::flash::{FlashGeometry, RdpLevel, Sector, WritePlan};
+use stlink::flash::{EraseUnit, FlashGeometry, RdpLevel, Sector, WritePlan};
 use stlink::probe::ApiVersion;
 use stlink::{CoreType, ProbeDescriptor, ProbeModel};
 
@@ -183,13 +183,27 @@ impl From<&stlink::ChipDescriptor> for ChipInfo {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct SectorRunDto {
+    pub count: u32,
+    pub size: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FlashBankDto {
+    pub base: u32,
+    pub size: u32,
+    pub runs: Vec<SectorRunDto>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashGeometryDto {
     pub base: u32,
     pub size: u32,
-    pub bank_size: u32,
-    pub sector_size: u32,
+    pub banks: Vec<FlashBankDto>,
+    /// `page` or `sector` (UI wording).
+    pub unit: &'static str,
     pub write_granularity: u32,
     pub erased_value: u8,
 }
@@ -199,8 +213,26 @@ impl From<&FlashGeometry> for FlashGeometryDto {
         Self {
             base: g.base,
             size: g.size,
-            bank_size: g.bank_size,
-            sector_size: g.sector_size,
+            banks: g
+                .banks
+                .iter()
+                .map(|b| FlashBankDto {
+                    base: b.base,
+                    size: b.size(),
+                    runs: b
+                        .runs
+                        .iter()
+                        .map(|r| SectorRunDto {
+                            count: r.count,
+                            size: r.size,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            unit: match g.unit {
+                EraseUnit::Page => "page",
+                EraseUnit::Sector => "sector",
+            },
             write_granularity: g.write_granularity,
             erased_value: g.erased_value,
         }
@@ -265,6 +297,7 @@ pub struct SectorDto {
     pub bank: u8,
     pub index: u32,
     pub addr: u32,
+    pub size: u32,
 }
 
 impl From<&Sector> for SectorDto {
@@ -273,6 +306,7 @@ impl From<&Sector> for SectorDto {
             bank: s.bank,
             index: s.index,
             addr: s.addr,
+            size: s.size,
         }
     }
 }
@@ -438,6 +472,7 @@ mod tests {
                 bank: 0,
                 index: 0,
                 addr: 0x0800_0000,
+                size: 0x2_0000,
             }],
         };
         let json = serde_json::to_value(FlashPlan::new(&plan, 50)).unwrap_or_default();

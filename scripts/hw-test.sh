@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Hardware regression for the bench: STM32H743 + ST-Link V2 (clone).
+# Hardware regression on any chip with a flash driver (bench: STM32H743 +
+# ST-Link V2 clone). The chip, flash size and family come from `probe`;
+# H7-only checks (DBGMCU through AP2) run only on H7.
 #
 #   scripts/hw-test.sh                 # non-destructive checks only
 #   scripts/hw-test.sh firmware.bin    # also flash firmware.bin and verify it
@@ -26,6 +28,21 @@ cargo build -q -p stlink-cli || exit 1
 CLI=(./target/debug/stlink-cli)
 R=(--connect-under-reset)
 
+# What is connected (connect under reset also wakes sleeping firmware).
+PROBE="$("${CLI[@]}" "${R[@]}" probe 2>/dev/null)"
+CHIPID="$(echo "$PROBE" | sed -n 's/^  chipid: *//p')"
+FLASH="$(echo "$PROBE" | sed -n 's/^  flash: *\([0-9]*\).*/\1/p')"
+FTYPE="$(echo "$PROBE" | sed -n 's/^  flash-type: *//p')"
+if [[ -z "$CHIPID" || -z "$FLASH" || "$FLASH" -eq 0 ]]; then
+    echo "no target found:"
+    echo "$PROBE"
+    exit 1
+fi
+echo "target: chip id $CHIPID, flash $FLASH bytes, flash type ${FTYPE:-unknown}"
+echo "$PROBE" | grep -E '^  layout:'
+# Read size for the comparison checks: 128 KiB or the whole flash if smaller.
+RSIZE=$((FLASH < 0x20000 ? FLASH : 0x20000))
+
 pass=0
 fail=0
 check() { # name, command...
@@ -45,6 +62,11 @@ has() { command -v "$1" >/dev/null; }
 check "list finds an ST-Link" \
     bash -c "'${CLI[*]}' list | grep -q '0483:'"
 
+# First: firmware that sleeps with debug clocks off (the bench) answers
+# erratically until DBGMCU keeps debug alive; this lasts until power-off.
+check "keep-debug-in-low-power, then plain probe works" \
+    bash -c "'${CLI[*]}' --keep-debug-in-low-power probe >/dev/null && '${CLI[*]}' probe | grep -q 'chipid:     $CHIPID'"
+
 if has st-info; then
     # Sequential, not <(...): two programs cannot share the probe.
     fields='^  (version|serial|flash|sram|chipid|dev-type):'
@@ -55,44 +77,55 @@ if has st-info; then
 fi
 
 # Also resumes the core: st-info leaves it halted at the reset vector.
-check "probe (under reset) identifies H743" \
-    bash -c "'${CLI[*]}' ${R[*]} probe | grep -q 'chipid:     0x450'"
+check "probe (under reset) finds a known chip" \
+    bash -c "'${CLI[*]}' ${R[*]} probe | grep -qE 'dev-type: +STM32|dev-type: +F'"
 
-check "DBGMCU via AP2 reads the H7 IDCODE" \
-    bash -c "'${CLI[*]}' mem --ap 2 0xE00E1000 | grep -qi '6450$'"
+if [[ "$FTYPE" == "H7" ]]; then
+    check "DBGMCU via AP2 reads the H7 IDCODE" \
+        bash -c "'${CLI[*]}' mem --ap 2 0xE00E1000 | grep -qi '${CHIPID#0x}$'"
+fi
 
-check "keep-debug-in-low-power, then plain probe works" \
-    bash -c "'${CLI[*]}' --keep-debug-in-low-power probe >/dev/null && '${CLI[*]}' probe | grep -q 'chipid:     0x450'"
 
 check "regs: PC in flash, core resumed" bash -c "
     out=\$('${CLI[*]}' regs 2>&1)
     echo \"\$out\" | grep -qE 'pc +0x08' && echo \"\$out\" | grep -q resumed || { echo \"\$out\"; false; }"
 
-check "read 128 KiB at 1.8 and 4 MHz match" bash -c "
-    '${CLI[*]}' ${R[*]} read '$TMP/a.bin' --size 0x20000 >/dev/null &&
-    '${CLI[*]}' ${R[*]} --freq 4000 read '$TMP/b.bin' --size 0x20000 >/dev/null &&
+check "read $RSIZE bytes at 1.8 and 4 MHz match" bash -c "
+    '${CLI[*]}' ${R[*]} read '$TMP/a.bin' --size $RSIZE >/dev/null &&
+    '${CLI[*]}' ${R[*]} --freq 4000 read '$TMP/b.bin' --size $RSIZE >/dev/null &&
     cmp -s '$TMP/a.bin' '$TMP/b.bin'"
 
 if has st-flash; then
     check "read matches st-flash read" bash -c "
-        st-flash --connect-under-reset read '$TMP/ref.bin' 0x08000000 0x20000 >/dev/null 2>&1 &&
+        st-flash --connect-under-reset read '$TMP/ref.bin' 0x08000000 $RSIZE >/dev/null 2>&1 &&
         cmp -s '$TMP/a.bin' '$TMP/ref.bin'"
 fi
 
 head -c 64 /dev/zero >"$TMP/z.bin"
-check "write rejects an unaligned address (nothing erased)" \
-    bash -c "! '${CLI[*]}' ${R[*]} write '$TMP/z.bin' --addr 0x08000010 2>&1 | grep -q Erasing"
-head -c 3000000 /dev/zero >"$TMP/big.bin"
+# Unaligned for the family's write unit (F0/F1: halfwords, F2/F4/F7: words
+# at x32, G4: double words, H7: 32-byte flash words). Not on F2/F4/F7: below
+# 2.7 V they program bytes and the address would be valid.
+case "$FTYPE" in
+    H7) UNALIGNED=0x08000010 ;;
+    G4) UNALIGNED=0x08000004 ;;
+    F0_F1_F3 | F1_XL) UNALIGNED=0x08000001 ;;
+    *) UNALIGNED="" ;;
+esac
+if [[ -n "$UNALIGNED" ]]; then
+    check "write rejects an unaligned address (nothing erased)" \
+        bash -c "! '${CLI[*]}' ${R[*]} write '$TMP/z.bin' --addr $UNALIGNED 2>&1 | grep -q Erasing"
+fi
+head -c $((FLASH + 1024)) /dev/zero >"$TMP/big.bin"
 check "write rejects a file larger than flash" \
     bash -c "! '${CLI[*]}' ${R[*]} write '$TMP/big.bin'"
 check "write rejects non-.bin files" \
     bash -c "! '${CLI[*]}' write '$TMP/z.hex'"
 check "flash unchanged after rejected writes" bash -c "
-    '${CLI[*]}' ${R[*]} read '$TMP/c.bin' --size 0x20000 >/dev/null && cmp -s '$TMP/a.bin' '$TMP/c.bin'"
+    '${CLI[*]}' ${R[*]} read '$TMP/c.bin' --size $RSIZE >/dev/null && cmp -s '$TMP/a.bin' '$TMP/c.bin'"
 
 if [[ $ERASE_ALL -eq 1 ]]; then
-    check "erase-all erases both banks" \
-        bash -c "'${CLI[*]}' ${R[*]} erase-all | grep -q 'bank 2/2 erased'"
+    check "erase-all erases every bank" \
+        bash -c "'${CLI[*]}' ${R[*]} erase-all | grep -q 'flash erased in'"
     check "whole flash reads as 0xFF after erase-all" bash -c "
         '${CLI[*]}' ${R[*]} --freq 4000 read '$TMP/erased.bin' >/dev/null &&
         size=\$(wc -c <'$TMP/erased.bin' | tr -d ' ') &&

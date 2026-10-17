@@ -33,7 +33,7 @@ export function useNow(ms: number, wall = false): number {
   return now;
 }
 
-/** `ST-Link V2 · STM32H743 · 3,28 В` */
+/** `ST-Link V2 · STM32H743 · 3.28 V` */
 export function DeviceChip() {
   const { s } = useApp();
   const { f } = useT();

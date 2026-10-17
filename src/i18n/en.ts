@@ -1,6 +1,22 @@
 // English strings, same keys as `ru.ts`.
 
 import type { Dict } from "./ru";
+import { NUMBERS as RU_NUMBERS } from "./ru";
+
+export const NUMBERS: typeof RU_NUMBERS = {
+  b: "bytes",
+  kb: "KB",
+  mb: "MB",
+  s: "s",
+  v: "V",
+  mhz: "MHz",
+  khz: "kHz",
+  group: ",",
+  dec: ".",
+  justNow: "just now",
+  minAgo: (n) => `${n} min ago`,
+  hAgo: (n) => `${n} h ago`,
+};
 
 const sectors = (n: number) => `${n} ${n === 1 ? "sector" : "sectors"}`;
 

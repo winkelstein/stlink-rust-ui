@@ -269,7 +269,7 @@ export interface QuickWriteSettings {
 export type ThemeSetting = "system" | "light" | "dark";
 export type LangSetting = "system" | "ru" | "en";
 
-/** App settings (the «Настройки» sheet). */
+/** App settings (the «Settings» sheet). */
 export interface AppSettings {
   lang: LangSetting;
   theme: ThemeSetting;
@@ -278,7 +278,7 @@ export interface AppSettings {
   resetAfter: boolean;
   /** Quick write always asks before erasing. */
   alwaysConfirm: boolean;
-  /** Applied on the next «Подключиться». */
+  /** Applied on the next «Connect». */
   swdKhz: number;
   underReset: boolean;
   keepDebugInLowPower: boolean;

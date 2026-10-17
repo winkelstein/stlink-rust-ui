@@ -46,7 +46,7 @@ export type MockFault = "Disconnected" | "CoreNotAccessible" | "FlashProtected" 
 export interface MockControlsState {
   /** On USB. */
   connected: boolean;
-  /** Opened by the app («Подключиться»). */
+  /** Opened by the app («Connect»). */
   opened: boolean;
   nextFault: MockFault | null;
   speed: number;

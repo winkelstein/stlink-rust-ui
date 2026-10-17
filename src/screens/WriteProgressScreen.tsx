@@ -21,7 +21,7 @@ interface StageRow {
   frac: number;
 }
 
-/** Shared layout of the write and full-erase progress (Main.dc.html «Прогресс»). */
+/** Shared layout of the write and full-erase progress (Main.dc.html «Progress»). */
 function ProgressLayout(props: {
   title: string;
   sub: string;

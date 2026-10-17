@@ -67,7 +67,7 @@ export interface Banner {
   /** `notice` — a cancelled operation. */
   kind: BackendError["kind"] | "notice";
   context: BannerContext;
-  /** Backend `message` (shown under «Подробнее»). */
+  /** Backend `message` (shown under «Details»). */
   message: string;
   /** Already translated text instead of the default one for the kind. */
   note?: string;
@@ -120,7 +120,7 @@ export interface AppState {
   overlay: Overlay | null;
   /** The discovered probe (from USB, not necessarily opened). */
   probe: ProbeSummary | null;
-  /** Set after «Подключиться»; `null` while disconnected. */
+  /** Set after «Connect»; `null` while disconnected. */
   session: DeviceSession | null;
   connecting: boolean;
   /**
@@ -133,10 +133,10 @@ export interface AppState {
   resetting: boolean;
   writeForm: WriteForm;
   readForm: ReadForm;
-  /** Write waiting for confirmation, and where «Отмена» returns. */
+  /** Write waiting for confirmation, and where «Cancel» returns. */
   confirm: { pending: PendingWrite; returnTo: "write" | "device" } | null;
   op: Operation | null;
-  /** Last started write — for «Повторить» / «Записать снова». */
+  /** Last started write — for «Retry» / «Flash again». */
   lastWrite: PendingWrite | null;
   writeResult: { result: WriteResult; pending: PendingWrite } | null;
   readResult: ReadResult | null;
@@ -258,7 +258,7 @@ function idle(s: AppState): boolean {
   return !isBusy(s) && s.session !== null && s.screen !== "confirm" && s.screen !== "eraseConfirm";
 }
 
-/** State after the probe is closed (unplugged or «Отключить»). */
+/** State after the probe is closed (unplugged or «Disconnect»). */
 function closed(s: AppState): AppState {
   return {
     ...s,

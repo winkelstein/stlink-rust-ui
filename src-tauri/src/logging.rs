@@ -1,7 +1,7 @@
 //! Logging: the in-app journal (ring buffer + `log://entry` events), a log
 //! file for bug reports and stderr. One filter for the journal and the file,
 //! switched on the fly: `stlink` TRACE (USB packet dumps) only with the
-//! «Подробный журнал USB» setting. `nusb` is off: it duplicates our errors.
+//! «Verbose USB log» setting. `nusb` is off: it duplicates our errors.
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;

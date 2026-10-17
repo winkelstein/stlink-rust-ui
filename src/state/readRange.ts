@@ -5,7 +5,7 @@ import type { ReadRange } from "./machine";
 
 /**
  * Field texts for a preset range; `custom` keeps the defaults from the mockup.
- * Locked fields show `0x200000 · 2 МБ`: the size suffix is added when
+ * Locked fields show `0x200000 · 2 MB`: the size suffix is added when
  * rendering (it depends on the language).
  */
 export function rangeFields(range: ReadRange, g: FlashGeometry): { startText: string; sizeText: string } {

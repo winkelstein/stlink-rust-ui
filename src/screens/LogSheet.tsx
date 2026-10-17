@@ -22,7 +22,7 @@ function line(e: LogEntry): string {
   return `${fmtLogTime(e.ts)} ${e.level.padEnd(5)} ${e.target}: ${e.message}`;
 }
 
-/** «Журнал»: the backend ring buffer, live; filter, copy, save, clear. */
+/** «Log»: the backend ring buffer, live; filter, copy, save, clear. */
 export function LogSheet() {
   const { s, ctl } = useApp();
   const { t } = useT();

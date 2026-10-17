@@ -2,7 +2,7 @@
 #
 # chip_id   uid_reg      flash_size_quirk
 #
-# flash_size_quirk (как в stlink, src/stlink-lib/common.c):
+# flash_size_quirk (as in stlink, src/stlink-lib/common.c):
 #   -             flash_size = reg[15:0] * 1 KiB
 #   zero_is_128k  reg == 0 -> 128 KiB
 #   low_byte      flash_size = reg[7:0] * 1 KiB

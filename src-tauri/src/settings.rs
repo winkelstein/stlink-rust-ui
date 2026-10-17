@@ -105,7 +105,7 @@ impl AppSettingsStore {
         self.lock().clone()
     }
 
-    /// «Подробный журнал USB».
+    /// «Verbose USB log».
     pub fn verbose_usb(&self) -> bool {
         self.lock()
             .get("verboseUsb")

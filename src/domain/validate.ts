@@ -5,19 +5,24 @@ import type { FlashGeometry } from "../backend/types";
 import type { I18n } from "../i18n/core";
 import { bankBase, bankOf, flashEnd, planWrite, sectorOf, type FlashRange, type PlanError } from "./geometry";
 import { fmtHex, fmtHex32, fmtRange } from "./format";
+import { NUMBERS as RU } from "../i18n/ru";
 
 /**
  * `0x08000000`, `134217728`, `256K`, `1M`, `0x4_0000`. Separators (`_`, spaces)
- * are ignored; text after `·` is ignored (locked fields show `0x200000 · 2 МБ`).
+ * are ignored; text after `·` is ignored (locked fields show `0x200000 · 2 MB`).
+ * Size suffixes: `K`/`KB`/`M`/`MB` and their Russian spellings.
  */
 export function parseNumber(text: string): number | null {
   const t = text.split("·")[0].replace(/[\s_]/g, "").toLowerCase();
   if (t === "") return null;
   let m = /^0x([0-9a-f]+)$/.exec(t);
   if (m) return checkU32(parseInt(m[1], 16));
-  m = /^(\d+)(k|kb|кб|m|mb|мб)?$/.exec(t);
+  m = /^(\d+)(\D*)$/.exec(t);
   if (!m) return null;
-  const mult = !m[2] ? 1 : m[2].startsWith("k") || m[2] === "кб" ? 1024 : 1024 * 1024;
+  const kb = ["k", "kb", RU.kb.toLowerCase()];
+  const mb = ["m", "mb", RU.mb.toLowerCase()];
+  if (m[2] !== "" && !kb.includes(m[2]) && !mb.includes(m[2])) return null;
+  const mult = m[2] === "" ? 1 : kb.includes(m[2]) ? 1024 : 1024 * 1024;
   return checkU32(parseInt(m[1], 10) * mult);
 }
 
@@ -91,7 +96,7 @@ export function checkReadRange(flash: FlashRange | null, startText: string, size
   return { ok: true, addr, size };
 }
 
-/** `0x40000 (256 КБ)`. */
+/** `0x40000 (256 KB)`. */
 export function fmtMax({ f }: I18n, bytes: number): string {
   return `${fmtHex(bytes)} (${f.size(bytes)})`;
 }

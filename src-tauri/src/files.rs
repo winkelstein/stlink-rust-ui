@@ -32,7 +32,7 @@ pub fn read_bin(path: impl AsRef<Path>) -> Result<Vec<u8>> {
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         return Err(BackendError::new(
             ErrorKind::Unsupported,
-            format!("«{name}»: поддерживаются только файлы .bin"),
+            format!("{name}: only .bin files are supported"),
         ));
     }
     let len = std::fs::metadata(path)

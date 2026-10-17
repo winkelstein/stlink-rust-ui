@@ -9,7 +9,7 @@ import { useT } from "../i18n";
 import { BannerSlot, screenStyle, useApp } from "./shared";
 
 /**
- * The probe is on USB but not opened by the app (after start, «Отключить», or
+ * The probe is on USB but not opened by the app (after start, «Disconnect», or
  * a failed connect). Data from the USB descriptor only. `blocked`: the last
  * connect found it claimed by another program, or (Windows) not on WinUSB.
  */

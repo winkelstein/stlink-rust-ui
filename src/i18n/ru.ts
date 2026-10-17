@@ -2,7 +2,26 @@
 // strings that hold sample values there are functions here. `en.ts` has the
 // same shape (`Dict`).
 
-import { plural } from "../domain/format";
+import { plural } from "../domain/plural";
+
+/** Units, separators and relative times for `domain/format.ts`. */
+export const NUMBERS = {
+  b: "байт",
+  kb: "КБ",
+  mb: "МБ",
+  s: "с",
+  v: "В",
+  mhz: "МГц",
+  khz: "кГц",
+  group: "\u00a0",
+  dec: ",",
+  justNow: "только что",
+  minAgo: (n: number) => `${n} мин назад`,
+  hAgo: (n: number) => `${n} ч назад`,
+};
+
+/** The language's own name, shown in the language picker in every language. */
+export const LANGUAGE_NAME = "Русский";
 
 const sectors = (n: number) => `${n} ${plural(n, ["сектор", "сектора", "секторов"])}`;
 

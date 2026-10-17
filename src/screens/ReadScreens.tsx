@@ -28,14 +28,14 @@ export function ReadScreen() {
   const locked = f.range !== "custom";
   const flash = s.session ? readableFlash(s.session.target) : null;
   const check = checkReadRange(flash, f.startText, f.sizeText);
-  // Bytes from the start address to the end of flash, for the hint under «Размер».
+  // Bytes from the start address to the end of flash, for the hint under «Size».
   const startCheck = checkReadRange(flash, f.startText, "");
   const max = startCheck.ok ? startCheck.size : null;
   const name = f.target?.name ?? ctl.readName();
   const dir = f.target?.dir ?? ctl.backend.defaultSaveTarget(name).dir;
   const ranges = g ? availableRanges(g) : (["custom"] as ReadRange[]);
   const dispatch = ctl.store.dispatch;
-  // Locked size fields read `0x200000 · 2 МБ`.
+  // Locked size fields read `0x200000 · 2 MB`.
   const shown = (key: "startText" | "sizeText") => {
     const v = parseNumber(f[key]);
     return locked && key === "sizeText" && v !== null ? `${f[key]} · ${fm.size(v)}` : f[key];

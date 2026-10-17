@@ -19,7 +19,7 @@ import { ru, type Dict } from "./ru";
 export type { Dict } from "./ru";
 export type { Lang } from "../domain/format";
 
-/** The «Язык» setting. */
+/** The «Language» setting. */
 export type LangSetting = "system" | Lang;
 
 /** `ru*` → ru, anything else → en. */

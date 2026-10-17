@@ -1,4 +1,4 @@
-// Quick write rules (docs/design/README.md, «Быстрая запись — правила»).
+// Quick write rules (docs/design/README.md, «Quick write rules»).
 
 import type { BinFile, FlashPlan, QuickWriteSettings } from "../backend/types";
 import { sameSectors } from "./geometry";
@@ -18,7 +18,7 @@ export const DEFAULT_QUICK: QuickWriteSettings = {
 
 /**
  * Skip the confirmation only if exactly the last confirmed sectors are erased
- * and «Всегда спрашивать перед стиранием» is off.
+ * and «Always confirm before erasing» is off.
  */
 export function needsConfirm(q: QuickWriteSettings, plan: FlashPlan, alwaysConfirm: boolean): boolean {
   return alwaysConfirm || !sameSectors(q.lastConfirmedSectors, plan.sectors);

@@ -56,7 +56,7 @@ interface Props {
 }
 
 // TODO(design): there are no error screens in the mockups; this inline banner
-// follows the cards of the device screen. The backend message is under «Подробнее».
+// follows the cards of the device screen. The backend message is under «Details».
 export function ErrorBanner({ banner, onAction, onDismiss, actionsDisabled }: Props) {
   const { t } = useT();
   const [open, setOpen] = useState(false);

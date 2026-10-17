@@ -10,7 +10,7 @@ import { shortcut } from "../platform";
 // Dev-only (mock) tooling: not translated.
 
 const FAULTS: { value: MockFault | "none"; label: string }[] = [
-  { value: "none", label: "Нет" },
+  { value: "none", label: "None" },
   { value: "Disconnected", label: "Disconnected" },
   { value: "CoreNotAccessible", label: "CoreNotAcc." },
   { value: "FlashProtected", label: "Protected" },
@@ -40,7 +40,7 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
   return (
     <div
       role="region"
-      aria-label="Dev-панель"
+      aria-label="Dev panel"
       className="card"
       style={{
         position: "absolute",
@@ -58,22 +58,22 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
     >
       <div style={{ ...row, justifyContent: "space-between" }}>
         <span className="eyebrow">Mock · dev</span>
-        <span style={{ color: "var(--text3)", fontSize: 11 }}>{shortcut("D", true)} — скрыть</span>
-        <button className="icon-btn" style={{ width: 22, height: 22 }} aria-label="Закрыть dev-панель" onClick={onClose}>
+        <span style={{ color: "var(--text3)", fontSize: 11 }}>{shortcut("D", true)} — hide</span>
+        <button className="icon-btn" style={{ width: 22, height: 22 }} aria-label="Close the dev panel" onClick={onClose}>
           ×
         </button>
       </div>
       <div style={row}>
         <span style={label}>USB</span>
         <Button style={{ height: 26 }} onClick={() => (st.connected ? c.disconnect() : c.connect())}>
-          {st.connected ? "Выдернуть" : "Вставить"}
+          {st.connected ? "Unplug" : "Plug in"}
         </Button>
         <span style={{ color: "var(--text2)" }}>
-          {st.connected ? (st.opened ? "подключён к приложению" : "найден, не открыт") : "нет"}
+          {st.connected ? (st.opened ? "connected to the app" : "found, not opened") : "none"}
         </span>
       </div>
       <div style={row}>
-        <span style={label}>Занят</span>
+        <span style={label}>Busy</span>
         <Button
           style={{ height: 26 }}
           disabled={!st.connected || st.opened}
@@ -82,24 +82,24 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
             void ctl.connect();
           }}
         >
-          Программатор занят другой программой
+          Programmer busy in another program
         </Button>
       </div>
       <div style={row}>
-        <span style={label}>Файл</span>
+        <span style={label}>File</span>
         <Button style={{ height: 26 }} disabled={st.watchedFiles === 0} onClick={() => c.touchWatchedFiles(true)}>
-          Изменить
+          Change
         </Button>
         <Button style={{ height: 26 }} disabled={st.watchedFiles === 0} onClick={() => c.touchWatchedFiles(false)}>
-          Тот же CRC
+          Same CRC
         </Button>
-        <span style={{ color: "var(--text2)" }}>{st.watchedFiles === 0 ? "слежения нет" : "слежу"}</span>
+        <span style={{ color: "var(--text2)" }}>{st.watchedFiles === 0 ? "not watched" : "watching"}</span>
       </div>
       <div style={row}>
-        <span style={label}>Ошибка</span>
+        <span style={label}>Fault</span>
         <div style={{ flex: 1 }}>
           <Segmented
-            label="Ошибка для следующей операции"
+            label="Fault for the next operation"
             value={st.nextFault ?? "none"}
             options={FAULTS}
             onChange={(v) => c.setNextFault(v === "none" ? null : v)}
@@ -107,19 +107,19 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
         </div>
       </div>
       <div style={row}>
-        <span style={label}>Скорость</span>
+        <span style={label}>Speed</span>
         <div style={{ width: 160 }}>
           <Segmented
-            label="Множитель скорости"
+            label="Speed multiplier"
             value={String(st.speed) as (typeof SPEEDS)[number]["value"]}
             options={SPEEDS}
             onChange={(v) => c.setSpeed(Number(v))}
           />
         </div>
-        <span style={label}>Язык</span>
+        <span style={label}>Language</span>
         <div style={{ width: 150 }}>
           <Segmented
-            label="Язык"
+            label="Language"
             value={app.settings.lang}
             options={LANGS}
             onChange={(lang) => ctl.store.dispatch({ type: "settingsChanged", patch: { lang } })}

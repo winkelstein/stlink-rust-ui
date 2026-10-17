@@ -5,9 +5,10 @@ import { Segmented } from "../components/Segmented";
 import { Sheet } from "../components/Sheet";
 import { SWD_FREQS, type AppSettings, type LangSetting, type ThemeSetting } from "../backend/types";
 import { useT } from "../i18n";
+import { LANGUAGE_NAME } from "../i18n/ru";
 import { useApp } from "./shared";
 
-/** «Настройки» (titlebar button, ⌘,). Changes apply and persist right away. */
+/** «Settings» (titlebar button, ⌘,). Changes apply and persist right away. */
 export function SettingsSheet() {
   const { s, ctl } = useApp();
   const { t, f } = useT();
@@ -33,7 +34,7 @@ export function SettingsSheet() {
                 value={st.lang}
                 options={[
                   { value: "system", label: t.sys },
-                  { value: "ru", label: "Русский" },
+                  { value: "ru", label: LANGUAGE_NAME },
                   { value: "en", label: "English" },
                 ]}
                 onChange={(lang) => set({ lang })}

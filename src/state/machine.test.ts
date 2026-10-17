@@ -39,7 +39,7 @@ const connected: Action[] = [
 ];
 
 describe("hot-plug and connection", () => {
-  it("a found probe is only shown: released until «Подключиться»", () => {
+  it("a found probe is only shown: released until «Connect»", () => {
     const s1 = run(connected[0]);
     expect(s1.screen).toBe("released");
     expect(s1.session).toBeNull();
@@ -59,7 +59,7 @@ describe("hot-plug and connection", () => {
     expect(reducer(s, connected[0]).screen).toBe("released");
   });
 
-  it("«Отключить» closes the session and shows released", () => {
+  it("«Disconnect» closes the session and shows released", () => {
     const s = run(...connected, { type: "released" });
     expect(s.screen).toBe("released");
     expect(s.session).toBeNull();

@@ -99,7 +99,7 @@ export class Controller {
     }, FILE_CHANGE_DEBOUNCE_MS);
   }
 
-  /** «Подключиться»: probe options from the settings, unless overridden (error banner). */
+  /** «Connect»: probe options from the settings, unless overridden (error banner). */
   async connect(override?: Partial<ConnectOptions>): Promise<void> {
     const id = this.probeId();
     if (!id || isBusy(this.s)) return;
@@ -123,7 +123,7 @@ export class Controller {
     }
   }
 
-  /** «Отключить»: close the probe so other programs can use it. */
+  /** «Disconnect»: close the probe so other programs can use it. */
   async disconnect(): Promise<void> {
     const id = this.probeId();
     if (!id || isBusy(this.s) || !this.s.session) return;
@@ -138,7 +138,7 @@ export class Controller {
 
   // ---- write ----
 
-  /** «Стереть и записать» on the write form: plan → confirmation sheet. */
+  /** «Erase and flash» on the write form: plan → confirmation sheet. */
   async requestWrite(): Promise<void> {
     const s = this.s;
     const id = this.probeId();
@@ -158,7 +158,7 @@ export class Controller {
     }
   }
 
-  /** ⌘R / «Записать» in the quick write card / auto triggers. */
+  /** ⌘R / «Flash» in the quick write card / auto triggers. */
   async quickWrite(origin: WriteOrigin): Promise<void> {
     const s = this.s;
     const id = this.probeId();

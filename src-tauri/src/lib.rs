@@ -116,7 +116,7 @@ fn list_devices(state: State<'_, AppState>) -> Vec<ProbeSummary> {
     state.probes.list()
 }
 
-/// The user's «Подключиться» (also with other options from an error banner).
+/// The user's «Connect» (also with other options from an error banner).
 #[tauri::command]
 async fn connect(
     state: State<'_, AppState>,
@@ -127,7 +127,7 @@ async fn connect(
     actor.call(move |w| w.connect_target(opts.into())).await
 }
 
-/// «Отключить»: close the probe so other programs can use it.
+/// «Disconnect»: close the probe so other programs can use it.
 #[tauri::command]
 async fn disconnect(state: State<'_, AppState>, probe_id: String) -> Result<()> {
     let actor = state.probes.actor(&probe_id)?;
@@ -228,7 +228,7 @@ async fn pick_bin_file(app: AppHandle) -> Result<Option<BinFile>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Прошивка", &["bin"])
+        .add_filter("Firmware", &["bin"])
         .pick_file(move |p| {
             let _ = tx.send(p);
         });
@@ -254,7 +254,7 @@ async fn pick_save_path(
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Прошивка", &["bin"])
+        .add_filter("Firmware", &["bin"])
         .set_directory(&state.downloads)
         .set_file_name(&default_name)
         .save_file(move |p| {
@@ -313,7 +313,7 @@ fn save_quick_write(state: State<'_, AppState>, uid: String, settings: Value) ->
     state.quick.save(uid, settings)
 }
 
-/// App settings; «Подробный журнал USB» takes effect right away.
+/// App settings; «Verbose USB log» takes effect right away.
 #[tauri::command]
 fn save_settings(state: State<'_, AppState>, settings: Value) -> Result<()> {
     state.settings.save(settings)?;

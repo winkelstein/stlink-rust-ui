@@ -4,7 +4,7 @@ import { allSectors, bankBase, bankCount, sectorRuns, type SectorRun } from "../
 import { fmtHex32, fmtRange } from "../domain/format";
 import { useT, type Dict } from "../i18n";
 
-/** `сектора 0–1, банк 1`, `сектор 7 банка 1 и 0 банка 2`. */
+/** `sectors 0–1, bank 1`, `sector 7 of bank 1 and 0 of bank 2`. */
 export function describeRuns(t: Dict, runs: readonly SectorRun[], longForm = false): string {
   const many = runs.some((r) => r.first !== r.last) || runs.length > 1;
   const items = runs.map((r) => ({

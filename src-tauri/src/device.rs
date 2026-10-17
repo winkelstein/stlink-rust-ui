@@ -156,7 +156,7 @@ impl Worker {
         r
     }
 
-    /// The user's «Подключиться»: open, connect, identify. On failure the
+    /// The user's «Connect»: open, connect, identify. On failure the
     /// probe is closed again (and stays closed).
     pub fn connect_target(&mut self, opts: ConnectOptions) -> Result<DeviceSession> {
         let r = self.connect_inner(opts);
@@ -166,7 +166,7 @@ impl Worker {
         r
     }
 
-    /// «Отключить»: close the USB device (drop `StLink` → leave debug mode,
+    /// «Disconnect»: close the USB device (drop `StLink` → leave debug mode,
     /// release the interface) so other programs can use the probe.
     pub fn disconnect(&mut self) {
         if self.link.take().is_some() {

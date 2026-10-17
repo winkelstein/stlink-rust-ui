@@ -1,15 +1,31 @@
 // UI formatting by language: ru — decimal comma, space-grouped thousands,
-// Russian units; en — decimal point, comma-grouped thousands.
+// Russian units; en — decimal point, comma-grouped thousands. The locale data
+// lives with the dictionaries (`NUMBERS` in src/i18n/{ru,en}.ts).
+
+import { NUMBERS as EN } from "../i18n/en";
+import { NUMBERS as RU } from "../i18n/ru";
+
+export { plural } from "./plural";
 
 export type Lang = "ru" | "en";
 
 const KB = 1024;
 const MB = 1024 * 1024;
 
+/** Units, separators and "… ago" texts of a language (read lazily: the
+ * dictionaries import this module). */
+function numbers(lang: Lang) {
+  return lang === "en" ? EN : RU;
+}
+
 const UNITS = {
-  ru: { b: "байт", kb: "КБ", mb: "МБ", s: "с", v: "В", mhz: "МГц", khz: "кГц", group: "\u00a0", dec: "," },
-  en: { b: "bytes", kb: "KB", mb: "MB", s: "s", v: "V", mhz: "MHz", khz: "kHz", group: ",", dec: "." },
-} as const;
+  get ru() {
+    return numbers("ru");
+  },
+  get en() {
+    return numbers("en");
+  },
+};
 
 /** Fixed decimals, trailing zeros trimmed if `trim`. */
 export function fmtNum(n: number, digits: number, trim = false, lang: Lang = "ru"): string {
@@ -25,7 +41,7 @@ export function fmtInt(n: number, lang: Lang = "ru"): string {
     .replace(/\B(?=(\d{3})+(?!\d))/g, UNITS[lang].group);
 }
 
-/** `183 КБ`, `1,75 МБ`, `2 МБ`, `512 байт` / `183 KB`, `1.75 MB`. */
+/** `183 KB`, `1.75 MB`, `2 MB`, `512 bytes` (units by language). */
 export function fmtSize(bytes: number, lang: Lang = "ru"): string {
   const u = UNITS[lang];
   if (bytes >= MB) return `${fmtNum(bytes / MB, 2, true, lang)} ${u.mb}`;
@@ -33,12 +49,12 @@ export function fmtSize(bytes: number, lang: Lang = "ru"): string {
   return `${fmtInt(bytes, lang)} ${u.b}`;
 }
 
-/** `2,00 МБ` — fixed two decimals, for running counters. */
+/** `2.00 MB` — fixed two decimals, for running counters. */
 export function fmtMb(bytes: number, lang: Lang = "ru"): string {
   return `${fmtNum(bytes / MB, 2, false, lang)} ${UNITS[lang].mb}`;
 }
 
-/** `148 КБ/с`. */
+/** `148 KB/s`. */
 export function fmtRate(bytesPerS: number, lang: Lang = "ru"): string {
   const u = UNITS[lang];
   return `${Math.round(bytesPerS / KB)} ${u.kb}/${u.s}`;
@@ -63,17 +79,17 @@ export function fmtHex16(n: number): string {
   return (n & 0xffff).toString(16).toUpperCase().padStart(4, "0");
 }
 
-/** `1,9 с` / `1.9 s`. */
+/** `1.9 s` (ru: decimal comma). */
 export function fmtSeconds(s: number, digits = 1, lang: Lang = "ru"): string {
   return `${fmtNum(Math.max(0, s), digits, false, lang)} ${UNITS[lang].s}`;
 }
 
-/** `3,28 В` / `3.28 V`. */
+/** `3.28 V` (ru: decimal comma). */
 export function fmtVoltage(v: number, lang: Lang = "ru"): string {
   return `${fmtNum(v, 2, false, lang)} ${UNITS[lang].v}`;
 }
 
-/** `1,8 МГц`, `950 кГц`. */
+/** `1.8 MHz`, `950 kHz`. */
 export function fmtFreq(khz: number, lang: Lang = "ru"): string {
   const u = UNITS[lang];
   return khz >= 1000 ? `${fmtNum(khz / 1000, 1, true, lang)} ${u.mhz}` : `${khz} ${u.khz}`;
@@ -104,22 +120,13 @@ export function fmtDate(ms: number): string {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-/** Russian plural: `plural(2, ['сектор', 'сектора', 'секторов'])`. */
-export function plural(n: number, forms: readonly [string, string, string]): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return forms[0];
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
-  return forms[2];
-}
-
-/** `только что`, `2 мин назад`, `3 ч назад`, `2026-10-15`. */
+/** `just now`, `2 min ago`, `3 h ago`, `2026-10-15`. */
 export function fmtAgo(ms: number, now: number, lang: Lang = "ru"): string {
+  const u = numbers(lang);
   const min = Math.floor((now - ms) / 60000);
-  const en = lang === "en";
-  if (min < 1) return en ? "just now" : "только что";
-  if (min < 60) return en ? `${min} min ago` : `${min} мин назад`;
+  if (min < 1) return u.justNow;
+  if (min < 60) return u.minAgo(min);
   const h = Math.floor(min / 60);
-  if (h < 24) return en ? `${h} h ago` : `${h} ч назад`;
+  if (h < 24) return u.hAgo(h);
   return fmtDate(ms);
 }

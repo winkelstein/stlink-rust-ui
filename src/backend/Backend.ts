@@ -42,9 +42,9 @@ export interface Backend {
    * discovered probe is not opened: the app never connects on its own.
    */
   watchDevices(cb: (e: DeviceEvent) => void): Unsubscribe;
-  /** «Подключиться»: `StLink::open` → `connect` → `identify` (+ RDP, geometry). */
+  /** «Connect»: `StLink::open` → `connect` → `identify` (+ RDP, geometry). */
   connect(probeId: ProbeId, opts: ConnectOptions): Promise<DeviceSession>;
-  /** «Отключить»: close the device so other programs can use the probe. */
+  /** «Disconnect»: close the device so other programs can use the probe. */
   disconnect(probeId: ProbeId): Promise<void>;
   /** `flash::plan_write`; rejects for invalid address/size. */
   planWrite(probeId: ProbeId, addr: number, len: number): Promise<FlashPlan>;
@@ -81,7 +81,7 @@ export interface Backend {
 
   /** App settings (loaded before the UI starts). */
   loadSettings(): AppSettings;
-  /** Persist; «Подробный журнал USB» takes effect right away. */
+  /** Persist; «Verbose USB log» takes effect right away. */
   saveSettings(s: AppSettings): void;
 
   /** The journal so far (ring buffer, oldest first). */

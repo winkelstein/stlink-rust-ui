@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Controller } from "../state/controller";
 import type { AppState } from "../state/machine";
 import { chipShortName, probeModelName } from "../domain/chipNames";
-import { fmtVoltage } from "../domain/format";
+import { useT } from "../i18n";
 import { StatusChip } from "../components/StatusChip";
 import { ErrorBanner } from "../components/ErrorBanner";
 
@@ -36,10 +36,12 @@ export function useNow(ms: number, wall = false): number {
 /** `ST-Link V2 · STM32H743 · 3,28 В` */
 export function DeviceChip() {
   const { s } = useApp();
+  const { f } = useT();
   if (!s.probe) return null;
   const parts = [probeModelName(s.probe.descriptor.model)];
   if (s.session) parts.push(chipShortName(s.session.target));
-  if (s.probe.targetVoltage !== null) parts.push(fmtVoltage(s.probe.targetVoltage));
+  const v = s.session?.probe.targetVoltage ?? null;
+  if (v !== null) parts.push(f.voltage(v));
   return <StatusChip>{parts.join(" · ")}</StatusChip>;
 }
 

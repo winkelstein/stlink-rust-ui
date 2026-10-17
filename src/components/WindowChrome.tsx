@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useT } from "../i18n";
 import { LogIcon, SettingsIcon } from "./Icons";
 
 interface Props {
@@ -6,17 +7,18 @@ interface Props {
   /** Tauri: native traffic lights over an overlay titlebar, window fills the viewport. */
   native: boolean;
   step: 1 | 2 | 3;
+  overlay: "log" | "settings" | null;
   onLog: () => void;
   onSettings: () => void;
   children: ReactNode;
 }
 
-const STEPS = ["Устройство", "Параметры", "Выполнение"] as const;
-
 /** `data-tauri-drag-region` does not apply to children, so every passive element gets it. */
 const drag = { "data-tauri-drag-region": "" } as const;
 
-export function WindowChrome({ dark, native, step, onLog, onSettings, children }: Props) {
+export function WindowChrome({ dark, native, step, overlay, onLog, onSettings, children }: Props) {
+  const { t } = useT();
+  const steps = [t.stepDevice, t.stepParams, t.stepRun];
   const cls = (n: number) => (n < step ? "step done" : n === step ? "step active" : "step");
   return (
     <div className={`win ${native ? "native" : "framed"}${dark ? " dark" : ""}`}>
@@ -44,7 +46,7 @@ export function WindowChrome({ dark, native, step, onLog, onSettings, children }
         </div>
         <ol
           {...drag}
-          aria-label="Шаги"
+          aria-label={t.steps}
           style={{
             flex: 1,
             display: "flex",
@@ -56,15 +58,20 @@ export function WindowChrome({ dark, native, step, onLog, onSettings, children }
             padding: 0,
           }}
         >
-          {STEPS.map((label, i) => (
-            <StepItem key={label} n={i + 1} label={label} cls={cls(i + 1)} last={i === STEPS.length - 1} current={i + 1 === step} />
+          {steps.map((label, i) => (
+            <StepItem key={i} n={i + 1} label={label} cls={cls(i + 1)} last={i === steps.length - 1} current={i + 1 === step} />
           ))}
         </ol>
         <div style={{ display: "flex", gap: 2, width: 120, justifyContent: "flex-end" }}>
-          <button className="icon-btn" aria-label="Журнал" title="Журнал" onClick={onLog}>
+          <button className={overlay === "log" ? "icon-btn on" : "icon-btn"} aria-label={t.log} title={t.log} onClick={onLog}>
             <LogIcon />
           </button>
-          <button className="icon-btn" aria-label="Настройки" title="Настройки" onClick={onSettings}>
+          <button
+            className={overlay === "settings" ? "icon-btn on" : "icon-btn"}
+            aria-label={t.settings}
+            title={`${t.settings} (⌘,)`}
+            onClick={onSettings}
+          >
             <SettingsIcon />
           </button>
         </div>

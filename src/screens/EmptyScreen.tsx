@@ -1,11 +1,11 @@
-import { Button } from "../components/Button";
 import { Footer } from "../components/Footer";
 import { ProbeLargeIcon } from "../components/Icons";
+import { useT } from "../i18n";
 import { BannerSlot, screenStyle, useApp } from "./shared";
 
 export function EmptyScreen() {
-  const { s, ctl } = useApp();
-  const armed = s.armed?.settings.onConnect && s.armed.settings.file ? s.armed.settings : null;
+  const { s } = useApp();
+  const { t } = useT();
   return (
     <div style={screenStyle}>
       <div
@@ -35,9 +35,9 @@ export function EmptyScreen() {
             <ProbeLargeIcon />
           </div>
         </div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>Подключите программатор</h1>
-        <p style={{ margin: 0, maxWidth: 420, textAlign: "center", color: "var(--text2)", fontSize: 13.5, lineHeight: 1.5 }}>
-          ST-Link по USB или плату в режиме DFU (BOOT0 = 1). Устройство появится здесь автоматически.
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{t.emptyTitle}</h1>
+        <p style={{ margin: 0, maxWidth: 440, textAlign: "center", color: "var(--text2)", fontSize: 13.5, lineHeight: 1.5 }}>
+          {t.emptyText}
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <span className="chip">ST-Link V2 · V2-1 · V3</span>
@@ -48,33 +48,10 @@ export function EmptyScreen() {
             <BannerSlot />
           </div>
         )}
-        {armed?.file && (
-          <div
-            className="card"
-            style={{
-              marginTop: s.banner ? 0 : 18,
-              padding: "10px 10px 10px 14px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              fontSize: 12.5,
-              maxWidth: 560,
-            }}
-          >
-            <span className="led" style={{ background: "var(--accent)", boxShadow: "0 0 0 3px var(--accentSoft)" }} />
-            <span style={{ flex: 1, lineHeight: 1.45 }}>
-              Автозапись включена: <b>{armed.file.name}</b> запишется сразу после подключения этого же{" "}
-              {armed.chipName ?? "МК"}
-            </span>
-            <Button style={{ height: 26 }} onClick={() => ctl.store.dispatch({ type: "disarm" })}>
-              Выключить
-            </Button>
-          </div>
-        )}
       </div>
       <Footer>
         <span className="spin sm" aria-hidden="true" />
-        <span style={{ fontSize: 12, color: "var(--text2)" }}>Ожидание устройства…</span>
+        <span style={{ fontSize: 12, color: "var(--text2)" }}>{t.waiting}</span>
       </Footer>
     </div>
   );

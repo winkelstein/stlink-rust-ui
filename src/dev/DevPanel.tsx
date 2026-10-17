@@ -1,7 +1,12 @@
 import { useSyncExternalStore } from "react";
 import type { MockBackend, MockFault } from "../backend/mock/MockBackend";
+import type { LangSetting } from "../backend/types";
 import { Button } from "../components/Button";
 import { Segmented } from "../components/Segmented";
+import type { Controller } from "../state/controller";
+import { useAppState } from "../state/store";
+
+// Dev-only (mock) tooling: not translated.
 
 const FAULTS: { value: MockFault | "none"; label: string }[] = [
   { value: "none", label: "Нет" },
@@ -9,6 +14,7 @@ const FAULTS: { value: MockFault | "none"; label: string }[] = [
   { value: "CoreNotAccessible", label: "CoreNotAcc." },
   { value: "FlashProtected", label: "Protected" },
   { value: "Busy", label: "Busy" },
+  { value: "EraseFault", label: "Erase err" },
 ];
 
 const SPEEDS = [
@@ -17,10 +23,17 @@ const SPEEDS = [
   { value: "20", label: "×20" },
 ] as const;
 
-/** Mock-only controls (⌥⌘D): hot-plug, file changes, injected errors, speed. */
-export function DevPanel({ mock, onClose }: { mock: MockBackend; onClose: () => void }) {
+const LANGS: { value: LangSetting; label: string }[] = [
+  { value: "system", label: "Sys" },
+  { value: "ru", label: "RU" },
+  { value: "en", label: "EN" },
+];
+
+/** Mock-only controls (⌥⌘D): hot-plug, file changes, injected errors, speed, language. */
+export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Controller; onClose: () => void }) {
   const c = mock.controls;
   const st = useSyncExternalStore(c.subscribe, c.getState);
+  const app = useAppState(ctl.store);
   const row = { display: "flex", alignItems: "center", gap: 8 } as const;
   const label = { fontSize: 11, color: "var(--text2)", width: 72, flex: "none" } as const;
   return (
@@ -32,7 +45,7 @@ export function DevPanel({ mock, onClose }: { mock: MockBackend; onClose: () => 
         position: "absolute",
         right: 12,
         bottom: 72,
-        width: 430,
+        width: 540,
         padding: "10px 12px",
         zIndex: 20,
         display: "flex",
@@ -50,11 +63,26 @@ export function DevPanel({ mock, onClose }: { mock: MockBackend; onClose: () => 
         </button>
       </div>
       <div style={row}>
-        <span style={label}>Устройство</span>
+        <span style={label}>USB</span>
         <Button style={{ height: 26 }} onClick={() => (st.connected ? c.disconnect() : c.connect())}>
-          {st.connected ? "Отключить" : "Подключить"}
+          {st.connected ? "Выдернуть" : "Вставить"}
         </Button>
-        <span style={{ color: "var(--text2)" }}>{st.connected ? "подключено" : "нет"}</span>
+        <span style={{ color: "var(--text2)" }}>
+          {st.connected ? (st.opened ? "подключён к приложению" : "найден, не открыт") : "нет"}
+        </span>
+      </div>
+      <div style={row}>
+        <span style={label}>Занят</span>
+        <Button
+          style={{ height: 26 }}
+          disabled={!st.connected || st.opened}
+          onClick={() => {
+            c.setNextFault("Busy");
+            void ctl.connect();
+          }}
+        >
+          Программатор занят другой программой
+        </Button>
       </div>
       <div style={row}>
         <span style={label}>Файл</span>
@@ -85,6 +113,15 @@ export function DevPanel({ mock, onClose }: { mock: MockBackend; onClose: () => 
             value={String(st.speed) as (typeof SPEEDS)[number]["value"]}
             options={SPEEDS}
             onChange={(v) => c.setSpeed(Number(v))}
+          />
+        </div>
+        <span style={label}>Язык</span>
+        <div style={{ width: 150 }}>
+          <Segmented
+            label="Язык"
+            value={app.settings.lang}
+            options={LANGS}
+            onChange={(lang) => ctl.store.dispatch({ type: "settingsChanged", patch: { lang } })}
           />
         </div>
       </div>

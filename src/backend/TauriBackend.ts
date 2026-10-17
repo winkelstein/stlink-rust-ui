@@ -6,13 +6,17 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Backend, DeviceEvent, OpOptions, Unsubscribe } from "./Backend";
 import {
   BackendFailure,
+  normalizeSettings,
+  type AppSettings,
   type BackendError,
   type BinFile,
   type ConnectOptions,
   type DeviceSession,
+  type EraseResult,
   type FlashPlan,
+  type LogEntry,
   type ProbeId,
-  type ProbeInfo,
+  type ProbeSummary,
   type Progress,
   type QuickWriteSettings,
   type ReadJob,
@@ -21,13 +25,14 @@ import {
   type WriteJob,
   type WriteResult,
 } from "./types";
-import { DEFAULT_QUICK } from "../domain/quickWrite";
+import { migrateQuick } from "../domain/quickWrite";
 
 /** What `init` returns (`src-tauri/src/lib.rs`). */
 interface InitData {
   downloadsDir: string;
   downloadsDisplay: string;
-  quickWrite: { uid: string; settings: Partial<QuickWriteSettings> }[];
+  quickWrite: { uid: string; settings: Partial<QuickWriteSettings> & Record<string, unknown> }[];
+  settings: unknown;
   logPath: string | null;
 }
 
@@ -70,12 +75,14 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
 
   private quick = new Map<string, QuickWriteSettings>();
+  private settings: AppSettings;
   private opSeq = 0;
 
   private constructor(private readonly initData: InitData) {
     for (const { uid, settings } of initData.quickWrite) {
-      this.quick.set(uid, { ...DEFAULT_QUICK, ...settings });
+      this.quick.set(uid, migrateQuick(settings));
     }
+    this.settings = normalizeSettings(initData.settings);
   }
 
   /** Loads what the synchronous parts of `Backend` need (settings, Downloads). */
@@ -99,14 +106,18 @@ export class TauriBackend implements Backend {
     };
     return lazyUnsub(async () => {
       const unlisten = await listen<DeviceEvent>("device-event", (ev) => deliver(ev.payload));
-      const present = await call<ProbeInfo[]>("list_devices");
+      const present = await call<ProbeSummary[]>("list_devices");
       present.forEach((probe) => deliver({ type: "connected", probe }));
       return unlisten;
     });
   }
 
-  identify(probeId: ProbeId, opts: ConnectOptions): Promise<DeviceSession> {
-    return call("identify", { probeId, opts });
+  connect(probeId: ProbeId, opts: ConnectOptions): Promise<DeviceSession> {
+    return call("connect", { probeId, opts });
+  }
+
+  disconnect(probeId: ProbeId): Promise<void> {
+    return call("disconnect", { probeId });
   }
 
   planWrite(probeId: ProbeId, addr: number, len: number): Promise<FlashPlan> {
@@ -121,15 +132,20 @@ export class TauriBackend implements Backend {
     return this.op("read_flash", probeId, job, o);
   }
 
+  eraseAll(probeId: ProbeId, o: OpOptions): Promise<EraseResult> {
+    return this.op("erase_all", probeId, null, o);
+  }
+
   /** Long operation: progress over a channel, abort → `cancel_op`. */
-  private async op<T>(cmd: string, probeId: ProbeId, job: WriteJob | ReadJob, o: OpOptions): Promise<T> {
+  private async op<T>(cmd: string, probeId: ProbeId, job: WriteJob | ReadJob | null, o: OpOptions): Promise<T> {
     if (o.signal.aborted) throw new BackendFailure({ kind: "Cancelled", message: "cancelled" });
     const opId = `${Date.now()}-${++this.opSeq}`;
     const onProgress = new Channel<Progress>((p) => o.onProgress(p));
     const onAbort = () => void call("cancel_op", { opId }).catch(() => undefined);
     o.signal.addEventListener("abort", onAbort, { once: true });
     try {
-      return await call<T>(cmd, { probeId, job, opId, onProgress });
+      const args = job ? { probeId, job, opId, onProgress } : { probeId, opId, onProgress };
+      return await call<T>(cmd, args);
     } finally {
       o.signal.removeEventListener("abort", onAbort);
     }
@@ -147,9 +163,7 @@ export class TauriBackend implements Backend {
 
   acceptDroppedFile(file: File): Promise<BinFile> {
     // Tauri delivers file drops as paths (`watchFileDrops`); a browser `File` has none.
-    return Promise.reject(
-      new BackendFailure({ kind: "Unsupported", message: `«${file.name}»: перетащите файл из Finder` }),
-    );
+    return Promise.reject(new BackendFailure({ kind: "Unsupported", message: `${file.name}: no path for a browser File` }));
   }
 
   watchFileDrops(cb: (paths: string[]) => void): Unsubscribe {
@@ -207,5 +221,34 @@ export class TauriBackend implements Backend {
     return [...this.quick.entries()]
       .map(([uid, settings]) => ({ uid, settings }))
       .sort((a, b) => b.settings.updatedAt - a.settings.updatedAt);
+  }
+
+  // ---- app settings (settings.json in the app config dir) ----
+
+  loadSettings(): AppSettings {
+    return this.settings;
+  }
+
+  saveSettings(s: AppSettings): void {
+    this.settings = s;
+    call("save_settings", { settings: s }).catch((e: unknown) => console.error("cannot save settings", e));
+  }
+
+  // ---- journal (ring buffer in src-tauri) ----
+
+  logEntries(): Promise<LogEntry[]> {
+    return call("log_entries");
+  }
+
+  watchLog(cb: (entries: LogEntry[]) => void): Unsubscribe {
+    return lazyUnsub(() => listen<LogEntry[]>("log://entry", (ev) => cb(ev.payload)));
+  }
+
+  clearLog(): Promise<void> {
+    return call("log_clear");
+  }
+
+  saveLog(text: string, defaultName: string): Promise<string | null> {
+    return call("log_save", { text, defaultName });
   }
 }

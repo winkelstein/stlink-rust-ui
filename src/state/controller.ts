@@ -1,18 +1,20 @@
 // Side effects of the state machine: backend calls, hot-plug, file watching,
-// persistence of quick write settings, cancellation.
+// persistence of settings, cancellation.
 
 import type { Backend, Unsubscribe } from "../backend/Backend";
 import { toBackendError, type BinFile, type ConnectOptions, type ProbeId } from "../backend/types";
 import { chipShortName } from "../domain/chipNames";
 import { parseNumber, checkReadRange } from "../domain/validate";
+import { DEFAULT_QUICK, FILE_CHANGE_DEBOUNCE_MS, needsConfirm, onFileChanged } from "../domain/quickWrite";
 import {
-  DEFAULT_QUICK,
-  FILE_CHANGE_DEBOUNCE_MS,
-  needsConfirm,
-  onFileChanged,
-  shouldWriteOnConnect,
-} from "../domain/quickWrite";
-import { isBusy, type AppState, type BannerAction, type PendingWrite, type ReadRange, type WriteOrigin } from "./machine";
+  connectOptions,
+  isBusy,
+  type AppState,
+  type BannerAction,
+  type PendingWrite,
+  type ReadRange,
+  type WriteOrigin,
+} from "./machine";
 import { defaultReadName, rangeFields } from "./readRange";
 import type { Store } from "./store";
 
@@ -23,8 +25,6 @@ export class Controller {
   private fileWatch: { key: string; unsub: Unsubscribe } | null = null;
   private debounce: ReturnType<typeof setTimeout> | null = null;
   private latestChange: BinFile | null = null;
-  /** Write-on-connect is checked once per plug-in, not on re-identify. */
-  private justConnected = false;
   private prev: AppState;
 
   constructor(
@@ -43,13 +43,11 @@ export class Controller {
   }
 
   start(): () => void {
-    this.loadArmed();
     this.unsubs.push(
+      // A found probe is only shown (`released`): the app never connects on its own.
       this.backend.watchDevices((e) => {
         if (e.type === "connected") {
           this.store.dispatch({ type: "probeConnected", probe: e.probe });
-          this.justConnected = true;
-          void this.identify(this.s.connectOptions);
         } else {
           this.abort?.abort();
           this.store.dispatch({ type: "probeDisconnected", probeId: e.probeId });
@@ -66,11 +64,6 @@ export class Controller {
     };
   }
 
-  private loadArmed() {
-    const armed = this.backend.listQuickWrite().find((x) => x.settings.onConnect && x.settings.file);
-    this.store.dispatch({ type: "armedLoaded", armed: armed ?? null });
-  }
-
   /** Persist settings and keep the file watcher in sync with the state. */
   private onState() {
     const s = this.s;
@@ -78,7 +71,7 @@ export class Controller {
     this.prev = s;
     const uid = s.session?.target.uid;
     if (uid && s.quick && s.quick !== prev.quick) this.backend.saveQuickWrite(uid, s.quick);
-    if (s.armed && prev.armed && s.armed !== prev.armed) this.backend.saveQuickWrite(s.armed.uid, s.armed.settings);
+    if (s.settings !== prev.settings) this.backend.saveSettings(s.settings);
 
     const want = s.session && s.quick?.onFileChange && s.quick.file ? s.quick.file.id : null;
     if ((this.fileWatch?.key ?? null) !== want) {
@@ -105,12 +98,14 @@ export class Controller {
     }, FILE_CHANGE_DEBOUNCE_MS);
   }
 
-  async identify(opts: ConnectOptions): Promise<void> {
+  /** «Подключиться»: probe options from the settings, unless overridden (error banner). */
+  async connect(override?: Partial<ConnectOptions>): Promise<void> {
     const id = this.probeId();
-    if (!id || this.s.identifying) return;
-    this.store.dispatch({ type: "identifyStarted", opts });
+    if (!id || isBusy(this.s)) return;
+    const opts = { ...connectOptions(this.s.settings), ...override };
+    this.store.dispatch({ type: "connectStarted" });
     try {
-      const session = await this.backend.identify(id, opts);
+      const session = await this.backend.connect(id, opts);
       if (this.probeId() !== id) return;
       const uid = session.target.uid;
       const quick = uid
@@ -120,13 +115,24 @@ export class Controller {
             updatedAt: Date.now(),
           })
         : null;
-      this.store.dispatch({ type: "identified", session, quick });
-      const first = this.justConnected;
-      this.justConnected = false;
-      if (first && shouldWriteOnConnect(quick)) void this.quickWrite("onConnect");
+      this.store.dispatch({ type: "connected", session, quick });
     } catch (e) {
-      this.store.dispatch({ type: "identifyFailed", error: toBackendError(e) });
+      if (this.probeId() !== id) return;
+      this.store.dispatch({ type: "connectFailed", error: toBackendError(e) });
     }
+  }
+
+  /** «Отключить»: close the probe so other programs can use it. */
+  async disconnect(): Promise<void> {
+    const id = this.probeId();
+    if (!id || isBusy(this.s) || !this.s.session) return;
+    try {
+      await this.backend.disconnect(id);
+    } catch (e) {
+      // The worker is gone (unplugged): hot-plug shows `empty` anyway.
+      console.warn("disconnect failed", toBackendError(e));
+    }
+    this.store.dispatch({ type: "released" });
   }
 
   // ---- write ----
@@ -140,16 +146,11 @@ export class Controller {
     if (!id || !file || addr === null || isBusy(s) || s.screen !== "write") return;
     try {
       const plan = await this.backend.planWrite(id, addr, file.size);
-      const f = this.s.writeForm;
+      const { verify, resetAfter } = this.s.settings;
       this.store.dispatch({
         type: "confirmRequested",
         returnTo: "write",
-        pending: {
-          file,
-          plan,
-          origin: "wizard",
-          job: { fileId: file.id, addr, verify: f.verify, resetAfter: f.resetAfter },
-        },
+        pending: { file, plan, origin: "wizard", job: { fileId: file.id, addr, verify, resetAfter } },
       });
     } catch (e) {
       this.store.dispatch({ type: "operationRejected", error: toBackendError(e), context: "write" });
@@ -170,9 +171,9 @@ export class Controller {
         file,
         plan,
         origin,
-        job: { fileId: file.id, addr: q.addr, verify: s.writeForm.verify, resetAfter: s.writeForm.resetAfter },
+        job: { fileId: file.id, addr: q.addr, verify: s.settings.verify, resetAfter: s.settings.resetAfter },
       };
-      if (needsConfirm(q, plan)) {
+      if (needsConfirm(q, plan, s.settings.alwaysConfirm)) {
         this.store.dispatch({ type: "confirmRequested", pending, returnTo: "device" });
       } else {
         this.runWrite(pending);
@@ -191,6 +192,33 @@ export class Controller {
 
   cancelConfirm() {
     this.store.dispatch({ type: "confirmCancelled" });
+  }
+
+  // ---- erase all ----
+
+  requestErase() {
+    this.store.dispatch({ type: "navigate", to: "eraseConfirm" });
+  }
+
+  confirmErase() {
+    const probe = this.probeId();
+    if (!probe || this.s.screen !== "eraseConfirm" || isBusy(this.s)) return;
+    const id = ++this.opSeq;
+    const abort = new AbortController();
+    this.abort = abort;
+    this.store.dispatch({ type: "eraseStarted", id, at: performance.now() });
+    this.backend
+      .eraseAll(probe, {
+        signal: abort.signal,
+        onProgress: (progress) => this.store.dispatch({ type: "opProgress", id, progress, at: performance.now() }),
+      })
+      .then(
+        (result) => this.store.dispatch({ type: "eraseFinished", id, result }),
+        (e: unknown) => this.store.dispatch({ type: "opFailed", id, error: toBackendError(e) }),
+      )
+      .finally(() => {
+        if (this.abort === abort) this.abort = null;
+      });
   }
 
   private runWrite(pending: PendingWrite) {
@@ -311,7 +339,6 @@ export class Controller {
   }
 
   bannerAction(a: BannerAction) {
-    const opts = this.s.connectOptions;
     switch (a) {
       case "retryWrite":
         return this.retryWrite();
@@ -319,14 +346,17 @@ export class Controller {
         this.store.dispatch({ type: "bannerDismissed" });
         this.store.dispatch({ type: "navigate", to: "read" });
         return this.startRead();
-      case "retryIdentify":
-        return void this.identify(opts);
+      case "retryConnect":
+        return void this.connect();
       case "retryReset":
         return void this.resetMcu();
+      case "retryErase":
+        this.store.dispatch({ type: "bannerDismissed" });
+        return this.requestErase();
       case "connectUnderReset":
-        return void this.identify({ ...opts, underReset: true });
+        return void this.connect({ underReset: true });
       case "keepDebugLowPower":
-        return void this.identify({ ...opts, keepDebugInLowPower: true });
+        return void this.connect({ keepDebugInLowPower: true });
     }
   }
 }

@@ -9,7 +9,6 @@ export const FILE_CHANGE_DEBOUNCE_MS = 1000;
 export const DEFAULT_QUICK: QuickWriteSettings = {
   file: null,
   addr: 0x0800_0000,
-  onConnect: false,
   onFileChange: false,
   lastConfirmedSectors: null,
   lastWrittenCrc: null,
@@ -17,25 +16,28 @@ export const DEFAULT_QUICK: QuickWriteSettings = {
   updatedAt: 0,
 };
 
-/** Skip the confirmation only if exactly the last confirmed sectors are erased. */
-export function needsConfirm(q: QuickWriteSettings, plan: FlashPlan): boolean {
-  return !sameSectors(q.lastConfirmedSectors, plan.sectors);
+/**
+ * Skip the confirmation only if exactly the last confirmed sectors are erased
+ * and «Всегда спрашивать перед стиранием» is off.
+ */
+export function needsConfirm(q: QuickWriteSettings, plan: FlashPlan, alwaysConfirm: boolean): boolean {
+  return alwaysConfirm || !sameSectors(q.lastConfirmedSectors, plan.sectors);
+}
+
+/** Stored settings of any version: defaults for missing keys, unknown keys
+ * (the removed `onConnect`) dropped. */
+export function migrateQuick(raw: Partial<QuickWriteSettings> & Record<string, unknown>): QuickWriteSettings {
+  const s: QuickWriteSettings = { ...DEFAULT_QUICK };
+  for (const k of Object.keys(DEFAULT_QUICK) as (keyof QuickWriteSettings)[]) {
+    if (raw[k] !== undefined) (s as unknown as Record<string, unknown>)[k] = raw[k];
+  }
+  return s;
 }
 
 export function sameFile(a: BinFile | null, b: BinFile | null): boolean {
   if (!a || !b) return false;
   // In the browser there are no paths and every pick gets a new id: compare names.
   return a.path !== null && b.path !== null ? a.path === b.path : a.name === b.name;
-}
-
-/** A different file switches «При подключении платы» off. */
-export function withChosenFile(q: QuickWriteSettings, file: BinFile): QuickWriteSettings {
-  return sameFile(q.file, file) ? q : { ...q, onConnect: false };
-}
-
-/** Write right after connecting: only for the same chip (settings are per UID). */
-export function shouldWriteOnConnect(q: QuickWriteSettings | null): boolean {
-  return !!q && q.onConnect && q.file !== null;
 }
 
 export type FileChangeDecision = "write" | "sameCrc" | "busy" | "off";

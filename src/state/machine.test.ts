@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { initialState, reducer, stepOf, type Action, type AppState, type PendingWrite } from "./machine";
-import { MOCK_PROBE, MOCK_TARGET, mockConnection } from "../backend/mock/mockData";
+import { MOCK_PROBE, MOCK_SUMMARY, MOCK_TARGET, mockConnection } from "../backend/mock/mockData";
 import { DEFAULT_QUICK } from "../domain/quickWrite";
 import { H743_GEOMETRY, planWrite } from "../domain/geometry";
 import type { BinFile, DeviceSession, FlashPlan, WriteResult } from "../backend/types";
@@ -33,27 +33,45 @@ function run(...actions: Action[]): AppState {
 }
 
 const connected: Action[] = [
-  { type: "probeConnected", probe: MOCK_PROBE },
-  { type: "identifyStarted", opts: initialState.connectOptions },
-  { type: "identified", session, quick: { ...DEFAULT_QUICK, file, onConnect: true } },
+  { type: "probeConnected", probe: MOCK_SUMMARY },
+  { type: "connectStarted" },
+  { type: "connected", session, quick: { ...DEFAULT_QUICK, file } },
 ];
 
-describe("hot-plug", () => {
-  it("connect shows the device screen, identify fills the session", () => {
+describe("hot-plug and connection", () => {
+  it("a found probe is only shown: released until «Подключиться»", () => {
     const s1 = run(connected[0]);
-    expect(s1.screen).toBe("device");
+    expect(s1.screen).toBe("released");
     expect(s1.session).toBeNull();
+    expect(stepOf(s1.screen)).toBe(1);
     const s = run(...connected);
-    expect(s.identifying).toBe(false);
+    expect(s.screen).toBe("device");
+    expect(s.connecting).toBe(false);
     expect(s.session).toEqual(session);
     expect(s.writeForm.file).toEqual(file);
   });
 
-  it("disconnect returns to empty and keeps write-on-connect armed", () => {
+  it("unplugging returns to empty, plugging in again to released", () => {
     const s = run(...connected, { type: "probeDisconnected", probeId: MOCK_PROBE.id });
     expect(s.screen).toBe("empty");
     expect(s.session).toBeNull();
-    expect(s.armed?.uid).toBe(MOCK_TARGET.uid);
+    expect(s.quick).toBeNull();
+    expect(reducer(s, connected[0]).screen).toBe("released");
+  });
+
+  it("«Отключить» closes the session and shows released", () => {
+    const s = run(...connected, { type: "released" });
+    expect(s.screen).toBe("released");
+    expect(s.session).toBeNull();
+    expect(s.probe?.id).toBe(MOCK_PROBE.id);
+  });
+
+  it("Busy on connect: released with the busy text, no banner", () => {
+    const s = run(connected[0], connected[1], { type: "connectFailed", error: { kind: "Busy", message: "busy" } });
+    expect(s.screen).toBe("released");
+    expect(s.busy).toBe(true);
+    expect(s.banner).toBeNull();
+    expect(reducer(s, { type: "connectStarted" }).busy).toBe(false);
   });
 
   it("disconnect during write: banner with retry, late results ignored", () => {
@@ -72,12 +90,13 @@ describe("hot-plug", () => {
     expect(back.banner?.kind).toBe("Disconnected");
   });
 
-  it("identify failure shows CoreNotAccessible hints", () => {
+  it("connect failure shows CoreNotAccessible hints on released", () => {
     const s = run(connected[0], connected[1], {
-      type: "identifyFailed",
+      type: "connectFailed",
       error: { kind: "CoreNotAccessible", message: "x" },
     });
-    expect(s.screen).toBe("device");
+    expect(s.screen).toBe("released");
+    expect(s.banner?.context).toBe("connect");
     expect(s.banner?.actions).toEqual(["connectUnderReset", "keepDebugLowPower"]);
   });
 });
@@ -123,7 +142,7 @@ describe("write flow", () => {
     );
     expect(s.screen).toBe("write");
     expect(s.banner?.kind).toBe("notice");
-    expect(s.banner?.text).toMatch(/частично записан/);
+    expect(s.banner?.context).toBe("write");
   });
 
   it("stale progress of another op is ignored", () => {
@@ -153,10 +172,16 @@ describe("write flow", () => {
     expect(p.banner?.actions).toEqual([]);
   });
 
-  it("choosing another file disarms write-on-connect", () => {
+  it("choosing a file opens the write form", () => {
     const s = run(...connected, { type: "fileChosen", file: { ...file, id: "f2", name: "other.bin" } });
-    expect(s.quick?.onConnect).toBe(false);
     expect(s.screen).toBe("write");
+    expect(s.writeForm.file?.name).toBe("other.bin");
+  });
+
+  it("verify/resetAfter are settings shared with the form", () => {
+    const s = run(...connected, { type: "settingsChanged", patch: { verify: false } });
+    expect(s.settings.verify).toBe(false);
+    expect(s.settings.resetAfter).toBe(true);
   });
 });
 
@@ -178,5 +203,57 @@ describe("read flow", () => {
     );
     expect(s.screen).toBe("readDone");
     expect(stepOf(s.screen)).toBe(3);
+  });
+});
+
+describe("erase all", () => {
+  const result = { banks: 2, size: 2 << 20, elapsedMs: 11_000, bankMs: [5500, 5500] };
+
+  it("device → confirm → progress by bank → done", () => {
+    const s = run(...connected, { type: "navigate", to: "eraseConfirm" });
+    expect(s.screen).toBe("eraseConfirm");
+    expect(stepOf(s.screen)).toBe(1);
+    const p = run(...connected, { type: "navigate", to: "eraseConfirm" }, { type: "eraseStarted", id: 4, at: 100 });
+    expect(p.screen).toBe("eraseProgress");
+    expect(p.op?.kind === "erase" && p.op.progress.total).toBe(2);
+    const p2 = reducer(p, { type: "opProgress", id: 4, progress: { stage: "erasing", done: 1, total: 2 }, at: 5600 });
+    expect(p2.op?.kind === "erase" && p2.op.bankStart).toEqual([100, 5600]);
+    const d = reducer(p2, { type: "eraseFinished", id: 4, result });
+    expect(d.screen).toBe("eraseDone");
+    expect(d.eraseResult).toEqual(result);
+    expect(d.quick?.lastWrittenCrc).toBeNull();
+  });
+
+  it("cancel in the confirm sheet returns to the device", () => {
+    const s = run(...connected, { type: "navigate", to: "eraseConfirm" }, { type: "confirmCancelled" });
+    expect(s.screen).toBe("device");
+  });
+
+  it("an error in the middle lands on the device with a banner", () => {
+    const s = run(
+      ...connected,
+      { type: "navigate", to: "eraseConfirm" },
+      { type: "eraseStarted", id: 5, at: 0 },
+      { type: "opFailed", id: 5, error: { kind: "Other", message: "flash operation failed (status 0x00020000)" } },
+    );
+    expect(s.screen).toBe("device");
+    expect(s.banner?.context).toBe("erase");
+    expect(s.banner?.actions).toEqual(["retryErase"]);
+    expect(s.banner?.message).toMatch(/0x00020000/);
+  });
+
+  it("not offered without a flash driver", () => {
+    const noDriver = { ...session, target: { ...MOCK_TARGET, geometry: null } };
+    const s = run(connected[0], connected[1], { type: "connected", session: noDriver, quick: null });
+    expect(reducer(s, { type: "navigate", to: "eraseConfirm" })).toBe(s);
+  });
+});
+
+describe("overlays", () => {
+  it("open and close over any screen", () => {
+    const s = run({ type: "overlayOpened", overlay: "settings" });
+    expect(s.overlay).toBe("settings");
+    expect(s.screen).toBe("empty");
+    expect(reducer(s, { type: "overlayClosed" }).overlay).toBeNull();
   });
 });

@@ -3,9 +3,14 @@ import { H743_GEOMETRY as g, planWrite, sameSectors, sectorRuns } from "./geomet
 import { crc32 } from "./crc32";
 import { parseNumber, writeAddrHint, checkReadRange } from "./validate";
 import { estimateWrite, remainingSeconds, writeFraction } from "./estimate";
-import { fmtFreq, fmtHex32, fmtInt, fmtRange, fmtSize, fmtUid, fmtVoltage, plural, SECTOR_FORMS } from "./format";
-import { DEFAULT_QUICK, needsConfirm, onFileChanged, shouldWriteOnConnect, withChosenFile } from "./quickWrite";
-import type { BinFile, FlashPlan } from "../backend/types";
+import { fmtAgo, fmtFreq, fmtHex32, fmtInt, fmtRange, fmtSize, fmtUid, fmtVoltage, plural } from "./format";
+import { DEFAULT_QUICK, migrateQuick, needsConfirm, onFileChanged } from "./quickWrite";
+import { normalizeSettings, DEFAULT_SETTINGS, type BinFile, type FlashPlan } from "../backend/types";
+import { dict, i18n, systemLang } from "../i18n/core";
+
+const ru = i18n("ru");
+const en = i18n("en");
+const SECTOR_FORMS = ["сектор", "сектора", "секторов"] as const;
 
 function plan(addr: number, len: number): FlashPlan {
   const r = planWrite(g, addr, len);
@@ -91,25 +96,25 @@ describe("parseNumber", () => {
 
 describe("writeAddrHint", () => {
   it("flash start", () => {
-    expect(writeAddrHint(g, "0x08000000", 187_392)).toEqual({
+    expect(writeAddrHint(ru, g, "0x08000000", 187_392)).toEqual({
       tone: "ok",
       text: "Начало flash, банк 1 · выровнено по сектору",
     });
   });
   it("bank 2 start", () => {
-    expect(writeAddrHint(g, "0x08100000", 1000).text).toBe("Начало банка 2 · выровнено по сектору");
+    expect(writeAddrHint(ru, g, "0x08100000", 1000).text).toBe("Начало банка 2 · выровнено по сектору");
   });
   it("mid sector warns", () => {
-    expect(writeAddrHint(g, "0x08020100", 1000).tone).toBe("warn");
+    expect(writeAddrHint(ru, g, "0x08020100", 1000).tone).toBe("warn");
   });
   it("errors", () => {
-    expect(writeAddrHint(g, "zz", 10).tone).toBe("error");
-    expect(writeAddrHint(g, "0x08000010", 10).text).toBe("Адрес должен быть кратен 32 байтам");
-    expect(writeAddrHint(g, "0x20000000", 10).text).toMatch(/^Адрес вне flash/);
-    expect(writeAddrHint(g, "0x081E0000", 256 * 1024).text).toMatch(/^Файл не помещается/);
+    expect(writeAddrHint(ru, g, "zz", 10).tone).toBe("error");
+    expect(writeAddrHint(ru, g, "0x08000010", 10).text).toBe("Адрес должен быть кратен 32 байтам");
+    expect(writeAddrHint(ru, g, "0x20000000", 10).text).toMatch(/^Адрес вне flash/);
+    expect(writeAddrHint(ru, g, "0x081E0000", 256 * 1024).text).toMatch(/^Файл не помещается/);
   });
   it("without a file only checks the address", () => {
-    expect(writeAddrHint(g, "0x081FFFE0", null).tone).not.toBe("error");
+    expect(writeAddrHint(ru, g, "0x081FFFE0", null).tone).not.toBe("error");
   });
 });
 
@@ -179,21 +184,19 @@ describe("quick write rules", () => {
   const p = plan(0x0800_0000, 1000);
 
   it("confirm unless the same sectors were confirmed", () => {
-    expect(needsConfirm(DEFAULT_QUICK, p)).toBe(true);
-    expect(needsConfirm({ ...DEFAULT_QUICK, lastConfirmedSectors: p.sectors }, p)).toBe(false);
-    expect(needsConfirm({ ...DEFAULT_QUICK, lastConfirmedSectors: plan(0x0802_0000, 10).sectors }, p)).toBe(true);
+    expect(needsConfirm(DEFAULT_QUICK, p, false)).toBe(true);
+    expect(needsConfirm({ ...DEFAULT_QUICK, lastConfirmedSectors: p.sectors }, p, false)).toBe(false);
+    expect(needsConfirm({ ...DEFAULT_QUICK, lastConfirmedSectors: plan(0x0802_0000, 10).sectors }, p, false)).toBe(true);
   });
 
-  it("another file switches write-on-connect off", () => {
-    const q = { ...DEFAULT_QUICK, file, onConnect: true };
-    expect(withChosenFile(q, { ...file, id: "b" }).onConnect).toBe(true);
-    expect(withChosenFile(q, { ...file, id: "c", name: "other.bin" }).onConnect).toBe(false);
+  it("«always confirm» forces the confirmation", () => {
+    expect(needsConfirm({ ...DEFAULT_QUICK, lastConfirmedSectors: p.sectors }, p, true)).toBe(true);
   });
 
-  it("write on connect needs a file", () => {
-    expect(shouldWriteOnConnect(null)).toBe(false);
-    expect(shouldWriteOnConnect({ ...DEFAULT_QUICK, onConnect: true })).toBe(false);
-    expect(shouldWriteOnConnect({ ...DEFAULT_QUICK, onConnect: true, file })).toBe(true);
+  it("old settings: onConnect is dropped, missing keys get defaults", () => {
+    const q = migrateQuick({ addr: 0x0810_0000, onConnect: true, file });
+    expect(q).toEqual({ ...DEFAULT_QUICK, addr: 0x0810_0000, file });
+    expect("onConnect" in q).toBe(false);
   });
 
   it("file change: CRC and busy checks", () => {
@@ -203,5 +206,52 @@ describe("quick write rules", () => {
     expect(onFileChanged(q, { ...file, crc32: 2 }, false)).toBe("write");
     expect(onFileChanged({ ...q, onFileChange: false }, { ...file, crc32: 2 }, false)).toBe("off");
     expect(onFileChanged(q, { ...file, name: "x.bin", crc32: 2 }, false)).toBe("off");
+  });
+});
+
+describe("i18n", () => {
+  it("en formatting", () => {
+    expect(fmtSize(187_392, "en")).toBe("183 KB");
+    expect(fmtSize(1.75 * 1024 * 1024, "en")).toBe("1.75 MB");
+    expect(fmtInt(187_392, "en")).toBe("187,392");
+    expect(fmtVoltage(3.28, "en")).toBe("3.28 V");
+    expect(fmtFreq(1800, "en")).toBe("1.8 MHz");
+    expect(fmtAgo(0, 2 * 60_000, "en")).toBe("2 min ago");
+    expect(fmtAgo(0, 2 * 60_000)).toBe("2 мин назад");
+  });
+
+  it("hints in English", () => {
+    expect(writeAddrHint(en, g, "0x08000000", 1000).text).toBe("Start of flash, bank 1 · sector-aligned");
+  });
+
+  it("system language: ru* → ru, anything else → en", () => {
+    expect(systemLang(["ru-RU", "en-US"])).toBe("ru");
+    expect(systemLang(["uk-UA", "ru-RU"])).toBe("en");
+    expect(systemLang(["de-DE"])).toBe("en");
+    expect(systemLang([])).toBe("en");
+  });
+
+  it("both dictionaries have the same keys", () => {
+    expect(Object.keys(dict("en")).sort()).toEqual(Object.keys(dict("ru")).sort());
+  });
+
+  it("plural strings", () => {
+    expect(dict("ru").cfTitle(2)).toBe("Стереть 2 сектора и записать прошивку?");
+    expect(dict("en").cfTitle(1)).toBe("Erase 1 sector and flash the firmware?");
+    expect(dict("ru").entries(21)).toBe("21 запись");
+    expect(dict("ru").banksVal(2)).toBe("1 и 2");
+  });
+});
+
+describe("settings", () => {
+  it("defaults and validation", () => {
+    expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
+    expect(normalizeSettings({ lang: "en", swdKhz: 4000, verify: false, theme: "neon", swd: 1 })).toEqual({
+      ...DEFAULT_SETTINGS,
+      lang: "en",
+      swdKhz: 4000,
+      verify: false,
+    });
+    expect(normalizeSettings({ swdKhz: 1234 }).swdKhz).toBe(1800);
   });
 });

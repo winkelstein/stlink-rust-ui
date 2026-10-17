@@ -2,8 +2,9 @@
 // texts shown under the fields.
 
 import type { FlashGeometry } from "../backend/types";
+import type { I18n } from "../i18n/core";
 import { bankBase, bankOf, flashEnd, planWrite, sectorOf, type PlanError } from "./geometry";
-import { fmtHex32, fmtRange, fmtSize } from "./format";
+import { fmtHex32, fmtRange } from "./format";
 
 /**
  * `0x08000000`, `134217728`, `256K`, `1M`, `0x4_0000`. Separators (`_`, spaces)
@@ -31,49 +32,52 @@ export interface Hint {
   text: string;
 }
 
-export function planErrorText(g: FlashGeometry, error: PlanError, addr: number, len: number): string {
+export function planErrorText({ t, f }: I18n, g: FlashGeometry, error: PlanError, addr: number, len: number): string {
   switch (error) {
     case "empty":
-      return "Файл пустой — записывать нечего";
+      return t.planEmpty;
     case "invalidGeometry":
-      return "Неизвестная раскладка flash";
+      return t.planGeometry;
     case "outside":
-      return `Адрес вне flash (${fmtRange(g.base, g.size)})`;
+      return t.planOutside(fmtRange(g.base, g.size));
     case "unaligned":
-      return `Адрес должен быть кратен ${g.writeGranularity} байтам`;
+      return t.planUnaligned(g.writeGranularity);
     case "doesNotFit":
-      return `Файл не помещается: до конца flash ${fmtSize(Math.max(0, flashEnd(g) - addr))}, нужно ${fmtSize(len)}`;
+      return t.planDoesNotFit(f.size(Math.max(0, flashEnd(g) - addr)), f.size(len));
   }
 }
 
 /** Address hint for the write form; `len` is `null` before a file is chosen. */
-export function writeAddrHint(g: FlashGeometry, text: string, len: number | null): Hint {
+export function writeAddrHint(tr: I18n, g: FlashGeometry, text: string, len: number | null): Hint {
+  const { t } = tr;
   const addr = parseNumber(text);
-  if (addr === null) return { tone: "error", text: "Введите адрес: 0x08000000 или десятичное число" };
+  if (addr === null) return { tone: "error", text: t.addrEnter };
   const res = planWrite(g, addr, len ?? g.writeGranularity);
-  if (!res.ok) return { tone: "error", text: planErrorText(g, res.error, addr, len ?? 0) };
+  if (!res.ok) return { tone: "error", text: planErrorText(tr, g, res.error, addr, len ?? 0) };
   const bank = bankOf(g, addr);
   const sector = sectorOf(g, addr);
   const where =
     addr === g.base
-      ? `Начало flash, банк ${bank + 1}`
+      ? t.addrFlashStart(bank + 1)
       : addr === bankBase(g, bank)
-        ? `Начало банка ${bank + 1}`
-        : `Сектор ${sector.index}, банк ${bank + 1}`;
-  if (sector.addr === addr) return { tone: "ok", text: `${where} · выровнено по сектору` };
-  return {
-    tone: "warn",
-    text: `${where} · не с начала сектора: сектор с ${fmtHex32(sector.addr)} будет стёрт целиком`,
-  };
+        ? t.addrBankStart(bank + 1)
+        : t.addrSector(sector.index, bank + 1);
+  if (sector.addr === addr) return { tone: "ok", text: t.addrAligned(where) };
+  return { tone: "warn", text: t.addrUnaligned(where, fmtHex32(sector.addr)) };
 }
 
-export type ReadCheck = { ok: true; addr: number; size: number } | { ok: false; text: string };
+export type ReadCheckError = "start" | "size" | "overflow";
+export type ReadCheck = { ok: true; addr: number; size: number } | { ok: false; error: ReadCheckError };
 
 export function checkReadRange(startText: string, sizeText: string): ReadCheck {
   const addr = parseNumber(startText);
-  if (addr === null) return { ok: false, text: "Введите начальный адрес: 0x08000000" };
+  if (addr === null) return { ok: false, error: "start" };
   const size = parseNumber(sizeText);
-  if (size === null || size === 0) return { ok: false, text: "Введите размер: 0x40000, 256K или 262144" };
-  if (addr + size > 2 ** 32) return { ok: false, text: "Диапазон выходит за конец адресного пространства" };
+  if (size === null || size === 0) return { ok: false, error: "size" };
+  if (addr + size > 2 ** 32) return { ok: false, error: "overflow" };
   return { ok: true, addr, size };
+}
+
+export function readCheckText({ t }: I18n, e: ReadCheckError): string {
+  return { start: t.readEnterStart, size: t.readEnterSize, overflow: t.readOverflow }[e];
 }

@@ -4,15 +4,17 @@ interface Props {
   /** 0..1 */
   value: number;
   large?: boolean;
+  /** Red (full erase). */
+  danger?: boolean;
   style?: CSSProperties;
   label?: string;
 }
 
-export function ProgressBar({ value, large, style, label }: Props) {
+export function ProgressBar({ value, large, danger, style, label }: Props) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
   return (
     <div
-      className="bar"
+      className={danger ? "bar danger" : "bar"}
       role="progressbar"
       aria-label={label}
       aria-valuemin={0}

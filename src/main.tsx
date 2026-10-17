@@ -11,7 +11,7 @@ if (isTauri()) document.body.classList.add("tauri");
 
 void createBackend().then(
   (backend) => {
-    const ctl = new Controller(backend, createStore(initialState));
+    const ctl = new Controller(backend, createStore({ ...initialState, settings: backend.loadSettings() }));
     // Outside React: StrictMode must not start hot-plug twice.
     ctl.start();
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
@@ -23,6 +23,6 @@ void createBackend().then(
   (e: unknown) => {
     console.error("cannot start the backend", e);
     const root = document.getElementById("root");
-    if (root) root.textContent = `Не удалось запустить: ${e instanceof Error ? e.message : String(e)}`;
+    if (root) root.textContent = `Cannot start: ${e instanceof Error ? e.message : String(e)}`;
   },
 );

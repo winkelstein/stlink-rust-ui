@@ -1,10 +1,13 @@
 import type {
+  AppSettings,
   BinFile,
   ConnectOptions,
   DeviceSession,
+  EraseResult,
   FlashPlan,
+  LogEntry,
   ProbeId,
-  ProbeInfo,
+  ProbeSummary,
   Progress,
   QuickWriteSettings,
   ReadJob,
@@ -17,7 +20,7 @@ import type {
 export type Unsubscribe = () => void;
 
 export type DeviceEvent =
-  | { type: "connected"; probe: ProbeInfo }
+  | { type: "connected"; probe: ProbeSummary }
   | { type: "disconnected"; probeId: ProbeId };
 
 export interface OpOptions {
@@ -34,10 +37,15 @@ export interface OpOptions {
 export interface Backend {
   readonly kind: "mock" | "tauri";
 
-  /** Hot-plug; emits `connected` for already present probes right away. */
+  /**
+   * Hot-plug; emits `connected` for already present probes right away. A
+   * discovered probe is not opened: the app never connects on its own.
+   */
   watchDevices(cb: (e: DeviceEvent) => void): Unsubscribe;
-  /** `StLink::open` → `connect` → `identify` (+ RDP, geometry). */
-  identify(probeId: ProbeId, opts: ConnectOptions): Promise<DeviceSession>;
+  /** «Подключиться»: `StLink::open` → `connect` → `identify` (+ RDP, geometry). */
+  connect(probeId: ProbeId, opts: ConnectOptions): Promise<DeviceSession>;
+  /** «Отключить»: close the device so other programs can use the probe. */
+  disconnect(probeId: ProbeId): Promise<void>;
   /** `flash::plan_write`; rejects for invalid address/size. */
   planWrite(probeId: ProbeId, addr: number, len: number): Promise<FlashPlan>;
   /** `write_flash` (+ `reset_and_run` if asked). */
@@ -45,6 +53,8 @@ export interface Backend {
   /** `dump` into `job.target`. */
   read(probeId: ProbeId, job: ReadJob, o: OpOptions): Promise<ReadResult>;
   resetAndRun(probeId: ProbeId): Promise<void>;
+  /** `flash::mass_erase`: every bank; progress counts banks. */
+  eraseAll(probeId: ProbeId, o: OpOptions): Promise<EraseResult>;
 
   /** Open dialog for a `.bin`; `null` if cancelled. */
   pickBinFile(): Promise<BinFile | null>;
@@ -66,4 +76,17 @@ export interface Backend {
   saveQuickWrite(uid: string, s: QuickWriteSettings): void;
   /** All stored settings, most recently updated first. */
   listQuickWrite(): { uid: string; settings: QuickWriteSettings }[];
+
+  /** App settings (loaded before the UI starts). */
+  loadSettings(): AppSettings;
+  /** Persist; «Подробный журнал USB» takes effect right away. */
+  saveSettings(s: AppSettings): void;
+
+  /** The journal so far (ring buffer, oldest first). */
+  logEntries(): Promise<LogEntry[]>;
+  /** New journal lines as they come, in batches. */
+  watchLog(cb: (entries: LogEntry[]) => void): Unsubscribe;
+  clearLog(): Promise<void>;
+  /** Save dialog for the journal text; the path, or `null` if cancelled. */
+  saveLog(text: string, defaultName: string): Promise<string | null>;
 }

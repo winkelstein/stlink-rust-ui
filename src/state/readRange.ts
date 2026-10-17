@@ -1,13 +1,17 @@
 import type { FlashGeometry } from "../backend/types";
-import { fmtDate, fmtHex, fmtHex32, fmtSize } from "../domain/format";
+import { fmtDate, fmtHex, fmtHex32 } from "../domain/format";
 import { bankBase, bankCount } from "../domain/geometry";
 import type { ReadRange } from "./machine";
 
-/** Field texts for a preset range; `custom` keeps the defaults from the mockup. */
+/**
+ * Field texts for a preset range; `custom` keeps the defaults from the mockup.
+ * Locked fields show `0x200000 · 2 МБ`: the size suffix is added when
+ * rendering (it depends on the language).
+ */
 export function rangeFields(range: ReadRange, g: FlashGeometry): { startText: string; sizeText: string } {
   const locked = (addr: number, size: number) => ({
     startText: fmtHex32(addr),
-    sizeText: `${fmtHex(size)} · ${fmtSize(size)}`,
+    sizeText: fmtHex(size),
   });
   switch (range) {
     case "all":

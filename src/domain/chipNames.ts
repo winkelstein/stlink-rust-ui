@@ -2,20 +2,22 @@
 // (`STM32H74x_H75x`); the UI shows a friendlier name where we know one.
 
 import type { CoreInfo, ProbeModel, TargetInfo } from "../backend/types";
+import type { Dict } from "../i18n/core";
 
 const NAMES: Record<number, { full: string; short: string }> = {
   0x450: { full: "STM32H743 / H753", short: "STM32H743" },
 };
 
-export function chipFullName(t: TargetInfo): string {
-  return NAMES[t.chipId]?.full ?? t.chip?.devType ?? "Неизвестный МК";
+export function chipFullName(t: TargetInfo, d: Dict): string {
+  return NAMES[t.chipId]?.full ?? t.chip?.devType ?? d.unknownChip;
 }
 
+/** Also used in file names: no translation. */
 export function chipShortName(t: TargetInfo): string {
-  return NAMES[t.chipId]?.short ?? t.chip?.devType ?? "МК";
+  return NAMES[t.chipId]?.short ?? t.chip?.devType ?? "MCU";
 }
 
-const CORE_NAMES: Record<CoreInfo["core"], string> = {
+const CORE_NAMES: Record<Exclude<CoreInfo["core"], "Unknown">, string> = {
   M0: "Cortex-M0",
   M0Plus: "Cortex-M0+",
   M3: "Cortex-M3",
@@ -23,12 +25,12 @@ const CORE_NAMES: Record<CoreInfo["core"], string> = {
   M7: "Cortex-M7",
   M23: "Cortex-M23",
   M33: "Cortex-M33",
-  Unknown: "Неизвестное ядро",
 };
 
 /** `Cortex-M7 r1p1`. */
-export function coreName(c: CoreInfo): string {
-  return `${CORE_NAMES[c.core]} r${c.revision[0]}p${c.revision[1]}`;
+export function coreName(c: CoreInfo, d: Dict): string {
+  const name = c.core === "Unknown" ? d.unknownCore : CORE_NAMES[c.core];
+  return `${name} r${c.revision[0]}p${c.revision[1]}`;
 }
 
 const PROBE_NAMES: Record<ProbeModel, string> = {

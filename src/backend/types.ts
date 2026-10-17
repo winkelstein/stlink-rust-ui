@@ -31,11 +31,16 @@ export interface ProbeVersion {
   display: string;
 }
 
-/** Opened probe: descriptor, firmware version and target voltage. */
-export interface ProbeInfo {
+/** A discovered probe: USB descriptor only, the device is not opened. */
+export interface ProbeSummary {
   id: ProbeId;
   descriptor: ProbeDescriptor;
-  version: ProbeVersion;
+}
+
+/** Opened probe: descriptor, firmware version and target voltage. */
+export interface ProbeInfo extends ProbeSummary {
+  /** `null` until the probe has been opened. */
+  version: ProbeVersion | null;
   /** Volts; `null` if the probe cannot measure it. */
   targetVoltage: number | null;
 }
@@ -105,7 +110,7 @@ export interface TargetInfo {
   rdp: RdpLevel | null;
 }
 
-/** Result of `identify`: everything shown on the device screen. */
+/** Result of `connect`: everything shown on the device screen. */
 export interface DeviceSession {
   probe: ProbeInfo;
   connection: Connection;
@@ -177,6 +182,16 @@ export interface SaveTarget {
   path: string | null;
 }
 
+/** `flash::mass_erase`. */
+export interface EraseResult {
+  banks: number;
+  /** Bytes erased (the whole flash). */
+  size: number;
+  elapsedMs: number;
+  /** Time of each bank. */
+  bankMs: number[];
+}
+
 export interface ReadJob {
   addr: number;
   size: number;
@@ -233,15 +248,74 @@ export function toBackendError(e: unknown): BackendError {
 export interface QuickWriteSettings {
   file: BinFile | null;
   addr: number;
-  /** Write as soon as the same chip (UID) is connected. */
-  onConnect: boolean;
   /** Rewrite when the file changes (debounced, CRC checked). */
   onFileChange: boolean;
   /** Sectors of the last write the user confirmed. */
   lastConfirmedSectors: Sector[] | null;
   /** CRC of the last successfully written image (for the file watcher). */
   lastWrittenCrc: number | null;
-  /** For the «waiting for the board» banner while no device is connected. */
+  /** Display name of the chip the settings belong to. */
   chipName: string | null;
   updatedAt: number;
+}
+
+export type ThemeSetting = "system" | "light" | "dark";
+export type LangSetting = "system" | "ru" | "en";
+
+/** App settings (the «Настройки» sheet). */
+export interface AppSettings {
+  lang: LangSetting;
+  theme: ThemeSetting;
+  /** Shared with the write form. */
+  verify: boolean;
+  resetAfter: boolean;
+  /** Quick write always asks before erasing. */
+  alwaysConfirm: boolean;
+  /** Applied on the next «Подключиться». */
+  swdKhz: number;
+  underReset: boolean;
+  keepDebugInLowPower: boolean;
+  /** `stlink` TRACE (USB packets) in the log. */
+  verboseUsb: boolean;
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  lang: "system",
+  theme: "system",
+  verify: true,
+  resetAfter: true,
+  alwaysConfirm: false,
+  swdKhz: 1800,
+  underReset: false,
+  keepDebugInLowPower: false,
+  verboseUsb: false,
+};
+
+export const SWD_FREQS = [4000, 1800, 950, 480] as const;
+
+/** Merge stored settings over the defaults, dropping unknown values. */
+export function normalizeSettings(raw: unknown): AppSettings {
+  const s = { ...DEFAULT_SETTINGS };
+  if (typeof raw !== "object" || raw === null) return s;
+  const r = raw as Record<string, unknown>;
+  const bool = (k: keyof AppSettings) => {
+    if (typeof r[k] === "boolean") (s as Record<string, unknown>)[k] = r[k];
+  };
+  (["verify", "resetAfter", "alwaysConfirm", "underReset", "keepDebugInLowPower", "verboseUsb"] as const).forEach(bool);
+  if (r.lang === "system" || r.lang === "ru" || r.lang === "en") s.lang = r.lang;
+  if (r.theme === "system" || r.theme === "light" || r.theme === "dark") s.theme = r.theme;
+  if (typeof r.swdKhz === "number" && (SWD_FREQS as readonly number[]).includes(r.swdKhz)) s.swdKhz = r.swdKhz;
+  return s;
+}
+
+export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR";
+
+/** One line of the journal (`tracing` event). */
+export interface LogEntry {
+  seq: number;
+  /** ms since epoch. */
+  ts: number;
+  level: LogLevel;
+  target: string;
+  message: string;
 }

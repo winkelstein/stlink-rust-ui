@@ -3,93 +3,53 @@ import { Footer, Spacer } from "../components/Footer";
 import { CheckSmallIcon, WarnIcon } from "../components/Icons";
 import { ProgressBar } from "../components/ProgressBar";
 import { chipShortName } from "../domain/chipNames";
-import { estimateWrite, remainingSeconds, SPEED, WRITE_STAGES, writeFraction } from "../domain/estimate";
-import { fmtHex32, fmtSeconds, fmtSize, plural, SECTOR_FORMS } from "../domain/format";
+import { estimateBankErase, estimateWrite, remainingSeconds, SPEED, WRITE_STAGES, writeFraction } from "../domain/estimate";
+import { fmtHex32, fmtRange } from "../domain/format";
+import { bankCount, sectorsPerBank } from "../domain/geometry";
+import { useT } from "../i18n";
 import type { WriteStage } from "../backend/types";
 import { screenStyle, useApp, useNow } from "./shared";
 
-const LABELS: Record<WriteStage, string> = {
-  erasing: "Стирание",
-  programming: "Программирование",
-  verifying: "Проверка",
-};
+interface StageRow {
+  key: string;
+  label: string;
+  detail: string;
+  isDone: boolean;
+  isActive: boolean;
+  isPending: boolean;
+  /** Fraction of the active stage. */
+  frac: number;
+}
 
-export function WriteProgressScreen() {
-  const { s, ctl } = useApp();
-  const now = useNow(100);
-  const op = s.op?.kind === "write" ? s.op : null;
-  if (!op || !s.session) return null;
-  const { plan, job, file } = op.pending;
-  const p = op.progress;
-  const est = estimateWrite(plan, job.verify);
-  const idx = WRITE_STAGES.indexOf(p.stage as WriteStage);
-  const stageStart = (st: WriteStage) => op.stageStart[st] ?? op.startedAt;
-
-  // Erase reports once per sector (~1 s): interpolate inside the current one.
-  let frac = p.total > 0 ? p.done / p.total : 0;
-  if (p.stage === "erasing" && p.total > 0 && p.done < p.total) {
-    const perSector =
-      p.done > 0 ? (op.lastProgressAt - stageStart("erasing")) / p.done : SPEED.eraseSector * 1000;
-    frac = (p.done + Math.min(0.95, (now - op.lastProgressAt) / Math.max(1, perSector))) / p.total;
-  }
-  const total = writeFraction(est, p, frac);
-  const left = remainingSeconds(est.total, total, (now - op.startedAt) / 1000);
-  const pct = Math.round(total * 100);
-
-  const stageSeconds = (st: WriteStage, i: number) => {
-    const next = WRITE_STAGES[i + 1];
-    const end = next && op.stageStart[next] !== undefined ? stageStart(next) : now;
-    return (end - stageStart(st)) / 1000;
-  };
-  const speedKBs = () => {
-    const t = (now - stageStart(p.stage as WriteStage)) / 1000;
-    return t > 0.3 ? Math.round(p.done / 1024 / t) : Math.round(SPEED.program / 1024);
-  };
-  const n = plan.sectors.length;
-
-  const stages = WRITE_STAGES.map((st, i) => {
-    const skipped = st === "verifying" && !job.verify;
-    const isDone = i < idx;
-    const isActive = i === idx;
-    let detail = "ожидание";
-    if (skipped) detail = "выключено";
-    else if (isDone) {
-      detail = [
-        `${n} ${plural(n, SECTOR_FORMS)} · ${fmtSeconds(stageSeconds(st, i))}`,
-        `${fmtSize(plan.len)} · ${fmtSeconds(stageSeconds(st, i))}`,
-        `совпадает · ${fmtSeconds(stageSeconds(st, i))}`,
-      ][i];
-    } else if (isActive) {
-      const stPct = Math.round(frac * 100);
-      detail = [
-        `сектор ${Math.min(n, p.done + 1)} из ${n}`,
-        `${stPct} % · ${Math.round(p.done / 1024)} из ${Math.round(p.total / 1024)} КБ · ${speedKBs()} КБ/с`,
-        `${stPct} %`,
-      ][i];
-    }
-    return { st, isDone, isActive: isActive && !skipped, isPending: !isDone && (!isActive || skipped), detail };
-  });
-
+/** Shared layout of the write and full-erase progress (Main.dc.html «Прогресс»). */
+function ProgressLayout(props: {
+  title: string;
+  sub: string;
+  total: number;
+  stages: StageRow[];
+  danger?: boolean;
+  onCancel?: () => void;
+}) {
+  const { t } = useT();
+  const pct = Math.round(props.total * 100);
   return (
     <div style={screenStyle}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 22, padding: "24px 120px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              Запись {file.name}
+              {props.title}
             </h2>
             <span className="mono" style={{ fontSize: 22, fontWeight: 600 }}>
               {pct}%
             </span>
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "4px 0 12px" }}>
-            {chipShortName(s.session.target)} · <span className="mono">{fmtHex32(plan.addr)}</span> · осталось {fmtSeconds(left)}
-          </div>
-          <ProgressBar value={total} large label="Общий прогресс" />
+          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "4px 0 12px" }}>{props.sub}</div>
+          <ProgressBar value={props.total} large danger={props.danger} label={t.progressLabel} />
         </div>
         <section className="card" style={{ padding: "4px 18px" }}>
-          {stages.map((x) => (
-            <div className="stage" key={x.st}>
+          {props.stages.map((x) => (
+            <div className="stage" key={x.key}>
               {x.isDone && (
                 <span className="st-ic done">
                   <CheckSmallIcon />
@@ -103,14 +63,12 @@ export function WriteProgressScreen() {
               {x.isPending && <span className="st-ic pending" />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: x.isPending ? "var(--text2)" : "var(--text)" }}>
-                    {LABELS[x.st]}
-                  </span>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: x.isPending ? "var(--text2)" : "var(--text)" }}>{x.label}</span>
                   <span className="mono" style={{ fontSize: 12, color: "var(--text2)" }}>
                     {x.detail}
                   </span>
                 </div>
-                {x.isActive && <ProgressBar value={frac} style={{ marginTop: 8 }} label={LABELS[x.st]} />}
+                {x.isActive && <ProgressBar value={x.frac} danger={props.danger} style={{ marginTop: 8 }} label={x.label} />}
               </div>
             </div>
           ))}
@@ -119,11 +77,132 @@ export function WriteProgressScreen() {
       <Footer>
         <span style={{ fontSize: 12, color: "var(--warn)", display: "flex", alignItems: "center", gap: 6 }}>
           <WarnIcon size={14} strokeWidth={2} />
-          Не отключайте программатор
+          {t.dontUnplug}
         </span>
         <Spacer />
-        <Button onClick={() => ctl.cancelOp()}>Отменить</Button>
+        <Button disabled={!props.onCancel} onClick={props.onCancel}>
+          {t.abort}
+        </Button>
       </Footer>
     </div>
+  );
+}
+
+export function WriteProgressScreen() {
+  const { s, ctl } = useApp();
+  const { t, f } = useT();
+  const now = useNow(100);
+  const op = s.op?.kind === "write" ? s.op : null;
+  if (!op || !s.session) return null;
+  const { plan, job, file } = op.pending;
+  const p = op.progress;
+  const est = estimateWrite(plan, job.verify);
+  const idx = WRITE_STAGES.indexOf(p.stage as WriteStage);
+  const stageStart = (st: WriteStage) => op.stageStart[st] ?? op.startedAt;
+
+  // Erase reports once per sector (~1 s): interpolate inside the current one.
+  let frac = p.total > 0 ? p.done / p.total : 0;
+  if (p.stage === "erasing" && p.total > 0 && p.done < p.total) {
+    const perSector = p.done > 0 ? (op.lastProgressAt - stageStart("erasing")) / p.done : SPEED.eraseSector * 1000;
+    frac = (p.done + Math.min(0.95, (now - op.lastProgressAt) / Math.max(1, perSector))) / p.total;
+  }
+  const total = writeFraction(est, p, frac);
+  const left = remainingSeconds(est.total, total, (now - op.startedAt) / 1000);
+
+  const stageSeconds = (st: WriteStage, i: number) => {
+    const next = WRITE_STAGES[i + 1];
+    const end = next && op.stageStart[next] !== undefined ? stageStart(next) : now;
+    return (end - stageStart(st)) / 1000;
+  };
+  const rate = () => {
+    const sec = (now - stageStart(p.stage as WriteStage)) / 1000;
+    return f.rate(sec > 0.3 ? p.done / sec : SPEED.program);
+  };
+  const n = plan.sectors.length;
+  const labels = [t.stErase, t.stProgram, t.stVerify];
+
+  const stages: StageRow[] = WRITE_STAGES.map((st, i) => {
+    const skipped = st === "verifying" && !job.verify;
+    const isDone = i < idx;
+    const isActive = i === idx;
+    let detail = t.stWaiting;
+    if (skipped) detail = t.stOff;
+    else if (isDone) {
+      const sec = f.seconds(stageSeconds(st, i));
+      detail = [`${t.sectorsN(n)} · ${sec}`, `${f.size(plan.len)} · ${sec}`, `${t.stMatch} · ${sec}`][i];
+    } else if (isActive) {
+      const stPct = Math.round(frac * 100);
+      detail = [
+        t.sectorOf(Math.min(n, p.done + 1), n),
+        t.kbOf(stPct, Math.round(p.done / 1024), Math.round(p.total / 1024), rate()),
+        `${stPct} %`,
+      ][i];
+    }
+    return {
+      key: st,
+      label: labels[i],
+      detail,
+      isDone,
+      isActive: isActive && !skipped,
+      isPending: !isDone && (!isActive || skipped),
+      frac,
+    };
+  });
+
+  return (
+    <ProgressLayout
+      title={t.writing(file.name)}
+      sub={`${chipShortName(s.session.target)} · ${fmtHex32(plan.addr)} · ${t.left(f.seconds(left))}`}
+      total={total}
+      stages={stages}
+      onCancel={() => ctl.cancelOp()}
+    />
+  );
+}
+
+/**
+ * Full erase: one stage per bank. A bank erase reports nothing until it ends
+ * (~5.5 s per MB), so the bar inside a bank fills on the time estimate (or the
+ * measured time of the previous bank) and stops short of the end.
+ */
+export function EraseProgressScreen() {
+  const { s, ctl } = useApp();
+  const { t, f } = useT();
+  const now = useNow(100);
+  const op = s.op?.kind === "erase" ? s.op : null;
+  const g = s.session?.target.geometry;
+  if (!op || !s.session || !g) return null;
+  const banks = Math.max(1, op.progress.total || bankCount(g));
+  const done = op.progress.done;
+  const measured = done > 0 ? (op.bankStart[done] - op.bankStart[0]) / done / 1000 : 0;
+  const perBank = measured > 0 ? measured : estimateBankErase(g.bankSize);
+  const current = op.bankStart[done] ?? op.startedAt;
+  const inBank = done < banks ? Math.min(0.97, (now - current) / 1000 / perBank) : 0;
+  const total = Math.min(1, (done + inBank) / banks);
+  const left = remainingSeconds(perBank * banks, total, (now - op.startedAt) / 1000);
+  const perBankSectors = sectorsPerBank(g);
+
+  const stages: StageRow[] = Array.from({ length: banks }, (_, i) => {
+    const isDone = i < done;
+    const isActive = i === done;
+    const sec = isDone ? (op.bankStart[i + 1] - op.bankStart[i]) / 1000 : 0;
+    const detail = isDone
+      ? `${f.size(g.bankSize)} · ${f.seconds(sec)}`
+      : isActive
+        ? t.sectorOf(Math.min(perBankSectors, Math.floor(inBank * perBankSectors) + 1), perBankSectors)
+        : t.stWaiting;
+    return { key: `b${i}`, label: t.bankN(i + 1), detail, isDone, isActive, isPending: i > done, frac: inBank };
+  });
+
+  return (
+    <ProgressLayout
+      danger
+      title={t.erasing}
+      sub={`${chipShortName(s.session.target)} · ${fmtRange(g.base, g.size)} · ${t.left(f.seconds(left))}`}
+      total={total}
+      stages={stages}
+      // Cancelling takes effect between banks.
+      onCancel={done < banks - 1 ? () => ctl.cancelOp() : undefined}
+    />
   );
 }

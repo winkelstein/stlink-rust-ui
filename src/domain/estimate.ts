@@ -6,6 +6,8 @@ import type { FlashPlan, Progress, WriteStage } from "../backend/types";
 export const SPEED = {
   /** Seconds per 128 KB sector. */
   eraseSector: 0.95,
+  /** Seconds per MB of bank erase (mass erase: H743, 5.5 s per 1 MB bank). */
+  eraseBankPerMb: 5.5,
   /** Bytes per second. */
   program: 137 * 1024,
   verify: 148 * 1024,
@@ -53,4 +55,9 @@ export function remainingSeconds(estTotal: number, fraction: number, elapsedS: n
   const expectedSoFar = estTotal * fraction;
   if (elapsedS < 0.5 || expectedSoFar < 0.2) return rest;
   return rest * (elapsedS / expectedSoFar);
+}
+
+/** Expected seconds to erase one bank of `bankSize` bytes. */
+export function estimateBankErase(bankSize: number): number {
+  return (bankSize / (1024 * 1024)) * SPEED.eraseBankPerMb;
 }

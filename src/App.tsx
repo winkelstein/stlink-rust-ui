@@ -3,28 +3,37 @@ import { isTauri } from "./backend";
 import { MockBackend } from "./backend/mock/MockBackend";
 import { DevPanel } from "./dev/DevPanel";
 import { WindowChrome } from "./components/WindowChrome";
+import { dict, I18nProvider, resolveLang } from "./i18n";
 import { isBusy, stepOf, type AppState } from "./state/machine";
 import type { Controller } from "./state/controller";
 import { useAppState } from "./state/store";
 import { useDarkMode } from "./useDarkMode";
 import { Ctx, useApp, type AppCtx } from "./screens/shared";
 import { EmptyScreen } from "./screens/EmptyScreen";
+import { ReleasedScreen } from "./screens/ReleasedScreen";
 import { DeviceScreen } from "./screens/DeviceScreen";
 import { WriteScreen } from "./screens/WriteScreen";
-import { WriteProgressScreen } from "./screens/WriteProgressScreen";
-import { WriteDoneScreen } from "./screens/WriteDoneScreen";
+import { EraseProgressScreen, WriteProgressScreen } from "./screens/WriteProgressScreen";
+import { EraseDoneScreen, WriteDoneScreen } from "./screens/WriteDoneScreen";
 import { ReadDoneScreen, ReadProgressScreen, ReadScreen } from "./screens/ReadScreens";
-import { ComingSoon } from "./screens/ComingSoon";
+import { SettingsSheet } from "./screens/SettingsSheet";
+import { LogSheet } from "./screens/LogSheet";
 
 export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export default function App({ ctl }: { ctl: Controller }) {
   const s = useAppState(ctl.store);
-  const dark = useDarkMode();
+  const systemDark = useDarkMode();
+  const dark = s.settings.theme === "system" ? systemDark : s.settings.theme === "dark";
+  const lang = resolveLang(s.settings.lang);
   const native = useMemo(isTauri, []);
   const ctx: AppCtx = { s, ctl, quickKey: IS_MAC ? "⌘R" : "Ctrl+R" };
   const mock = ctl.backend instanceof MockBackend ? ctl.backend : null;
   const [devOpen, setDevOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -37,16 +46,22 @@ export default function App({ ctl }: { ctl: Controller }) {
         }
         return;
       }
+      // ⌘,: settings.
+      if (mod && !e.altKey && e.key === ",") {
+        e.preventDefault();
+        ctl.store.dispatch({ type: "overlayOpened", overlay: "settings" });
+        return;
+      }
       // ⌘R: quick write. Always swallowed so the webview never reloads.
       if (mod && !e.altKey && !e.shiftKey && e.code === "KeyR") {
         e.preventDefault();
-        if (!e.repeat) void ctl.quickWrite("quick");
+        if (!e.repeat && !ctl.store.getState().overlay) void ctl.quickWrite("quick");
         return;
       }
       if (e.key === "Escape") {
         const st = ctl.store.getState();
-        if (st.stub) ctl.store.dispatch({ type: "stubClosed" });
-        else if (st.screen === "confirm") ctl.cancelConfirm();
+        if (st.overlay) ctl.store.dispatch({ type: "overlayClosed" });
+        else if (st.screen === "confirm" || st.screen === "eraseConfirm") ctl.cancelConfirm();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -77,36 +92,45 @@ export default function App({ ctl }: { ctl: Controller }) {
     [ctl],
   );
 
+  const toggleOverlay = (o: "log" | "settings") =>
+    ctl.store.dispatch(s.overlay === o ? { type: "overlayClosed" } : { type: "overlayOpened", overlay: o });
+
   return (
-    <Ctx.Provider value={ctx}>
-      <div className={native ? undefined : "stage-page"} onDragOver={onDragOver} onDrop={onDrop}>
-        <WindowChrome
-          dark={dark}
-          native={native}
-          step={stepOf(s.screen)}
-          onLog={() => ctl.store.dispatch({ type: "stubOpened", stub: "log" })}
-          onSettings={() => ctl.store.dispatch({ type: "stubOpened", stub: "settings" })}
-        >
-          <Screen />
-          {s.stub && <ComingSoon which={s.stub} onClose={() => ctl.store.dispatch({ type: "stubClosed" })} />}
-          {mock && devOpen && <DevPanel mock={mock} onClose={() => setDevOpen(false)} />}
-        </WindowChrome>
-      </div>
-    </Ctx.Provider>
+    <I18nProvider lang={lang}>
+      <Ctx.Provider value={ctx}>
+        <div className={native ? undefined : "stage-page"} onDragOver={onDragOver} onDrop={onDrop}>
+          <WindowChrome
+            dark={dark}
+            native={native}
+            step={stepOf(s.screen)}
+            overlay={s.overlay}
+            onLog={() => toggleOverlay("log")}
+            onSettings={() => toggleOverlay("settings")}
+          >
+            <Screen />
+            {s.overlay === "settings" && <SettingsSheet />}
+            {s.overlay === "log" && <LogSheet />}
+            {mock && devOpen && <DevPanel mock={mock} ctl={ctl} onClose={() => setDevOpen(false)} />}
+          </WindowChrome>
+        </div>
+      </Ctx.Provider>
+    </I18nProvider>
   );
 }
 
 function canDropIn(s: AppState): boolean {
-  return !!s.session?.target.geometry && !isBusy(s) && ["device", "write", "writeDone"].includes(s.screen);
+  return !!s.session?.target.geometry && !isBusy(s) && !s.overlay && ["device", "write", "writeDone", "eraseDone"].includes(s.screen);
 }
 
 /** Only `.bin`; then open the write form with the file. */
 function acceptDrop(ctl: Controller, name: string, source: File | string) {
   if (!name.toLowerCase().endsWith(".bin")) {
+    const t = dict(resolveLang(ctl.store.getState().settings.lang));
     ctl.store.dispatch({
       type: "operationRejected",
       context: "write",
-      error: { kind: "Unsupported", message: `«${name}»: поддерживаются только файлы .bin` },
+      error: { kind: "Unsupported", message: name },
+      note: t.onlyBin(name),
     });
     return;
   }
@@ -118,8 +142,15 @@ function Screen() {
   switch (s.screen) {
     case "empty":
       return <EmptyScreen />;
+    case "released":
+      return <ReleasedScreen />;
     case "device":
+    case "eraseConfirm":
       return <DeviceScreen />;
+    case "eraseProgress":
+      return <EraseProgressScreen />;
+    case "eraseDone":
+      return <EraseDoneScreen />;
     case "write":
     case "confirm":
       return <WriteScreen />;

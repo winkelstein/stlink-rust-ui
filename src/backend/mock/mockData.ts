@@ -1,6 +1,6 @@
 // Bench values from the mockups: ST-Link V2 clone V2J46S7 + STM32H743.
 
-import type { ConnectOptions, Connection, ProbeInfo, TargetInfo } from "../types";
+import type { ConnectOptions, Connection, LogLevel, ProbeInfo, ProbeSummary, TargetInfo } from "../types";
 import { H743_GEOMETRY } from "../../domain/geometry";
 
 export const MOCK_PROBE: ProbeInfo = {
@@ -16,6 +16,8 @@ export const MOCK_PROBE: ProbeInfo = {
   version: { stlink: 2, jtag: 46, swim: 7, msd: 0, bridge: 0, api: "V2", display: "V2J46S7" },
   targetVoltage: 3.28,
 };
+
+export const MOCK_SUMMARY: ProbeSummary = { id: MOCK_PROBE.id, descriptor: MOCK_PROBE.descriptor };
 
 export const MOCK_UID = "003A00293133510D36383837";
 
@@ -63,6 +65,27 @@ export function synthFirmware(name: string, size: number, salt = 0): Uint8Array 
   return out;
 }
 
+/** Journal lines of the mockup (`LOG` in Main.dc.html), time of day + level + message. */
+export const MOCK_LOG: readonly [string, LogLevel, string][] = [
+  ["14:31:58.402", "INFO", "probe found: ST-Link V2 0483:3748, serial 37FF71064E57343641412543"],
+  ["14:31:58.409", "TRACE", "→ F1 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 (GET_VERSION)"],
+  ["14:31:58.410", "TRACE", "← 2E 87 83 04 48 37 (ST-Link v2, JTAG v46, SWIM v7)"],
+  ["14:31:58.415", "INFO", "firmware V2J46S7, api v2, target voltage 3.28 V"],
+  ["14:31:58.433", "DEBUG", "swd clock set to 1800 kHz"],
+  ["14:31:58.471", "INFO", "target: STM32H74x_H75x (0x450), Cortex-M7 r1p1, flash 2 MiB, rdp 0"],
+  ["14:32:03.120", "INFO", "write plan: erase sectors 0-1 of bank 1 (256 KiB)"],
+  ["14:32:05.044", "INFO", "erase done in 1.92 s"],
+  ["14:32:06.341", "INFO", "programmed 187392 bytes in 1.30 s (141 KiB/s)"],
+  ["14:32:06.342", "TRACE", "→ F2 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 (GETLASTRWSTATUS2)"],
+  ["14:32:06.343", "TRACE", "← 80 00 00 00 00 00 00 00 00 00 00 00 (OK)"],
+  ["14:32:07.118", "INFO", "verify ok, crc32 0x9A41C2F7"],
+  ["14:32:07.140", "INFO", "reset and run"],
+  ["14:35:12.006", "WARN", "usb transfer timed out after 1000 ms, retrying"],
+  ["14:35:12.410", "ERROR", "probe disconnected"],
+  ["14:35:14.882", "INFO", "probe found: ST-Link V2 0483:3748, serial 37FF71064E57343641412543"],
+  ["14:35:14.950", "INFO", "target: STM32H74x_H75x (0x450), Cortex-M7 r1p1, flash 2 MiB, rdp 0"],
+];
+
 /** Rust `Display` texts of the errors the dev panel can inject. */
 export const MOCK_MESSAGES = {
   Disconnected: "device disconnected",
@@ -70,5 +93,6 @@ export const MOCK_MESSAGES = {
     "STM32H74x_H75x: core not accessible (firmware in low-power mode?); enable debug in low-power modes or connect under reset",
   FlashProtected: "flash is protected",
   Busy: "USB device is busy (used by another program?)",
+  EraseFault: "flash operation failed (status 0x00020000)",
   NotConnected: "device not found",
 } as const;

@@ -20,3 +20,11 @@ pub use probe::{ProbeCapabilities, ProbeVersion, StLink};
 pub use session::{ConnectOptions, Connection};
 pub use target::TargetInfo;
 pub use usb::{ProbeDescriptor, ProbeModel, list_probes};
+
+/// The GUI keeps a probe in a worker thread: these types must be `Send`.
+const _: () = {
+    const fn assert_send<T: Send>() {}
+    assert_send::<StLink>();
+    assert_send::<Error>();
+    assert_send::<ProbeDescriptor>();
+};

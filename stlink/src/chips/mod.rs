@@ -92,7 +92,7 @@ pub fn table() -> &'static [ChipDescriptor] {
     })
 }
 
-/// Look up a chip by DBGMCU_IDCODE[11:0].
+/// Look up a chip by `DBGMCU_IDCODE[11:0]`.
 pub fn find(chip_id: u16) -> Option<&'static ChipDescriptor> {
     table().iter().find(|c| c.chip_id == chip_id)
 }

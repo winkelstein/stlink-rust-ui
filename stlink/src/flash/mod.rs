@@ -367,6 +367,59 @@ pub fn crc32(data: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::arm::CoreInfo;
+    use crate::chips;
+
+    fn target(chip_id: u16, flash_size: Option<u32>) -> TargetInfo {
+        TargetInfo {
+            core: CoreInfo::from_cpuid(0x411F_C271),
+            chip: chips::find(chip_id),
+            chip_id,
+            idcode_raw: u32::from(chip_id),
+            flash_size,
+            uid: None,
+        }
+    }
+
+    #[test]
+    fn read_len_defaults_to_end_of_flash() {
+        let t = target(0x450, Some(2 * 1024 * 1024));
+        assert_eq!(read_len(&t, 0x0800_0000, None).ok(), Some(2 * 1024 * 1024));
+        assert_eq!(read_len(&t, 0x0810_0000, None).ok(), Some(1024 * 1024));
+        assert_eq!(read_len(&t, 0x2000_0000, Some(64)).ok(), Some(64));
+        assert!(
+            read_len(&t, 0x2000_0000, None).is_err(),
+            "outside flash needs size"
+        );
+        assert!(read_len(&t, 0xFFFF_FFF0, Some(32)).is_err(), "past 4 GiB");
+        let unknown_size = target(0x450, None);
+        assert!(read_len(&unknown_size, 0x0800_0000, None).is_err());
+    }
+
+    #[test]
+    fn in_flash_bounds() {
+        let t = target(0x450, Some(2 * 1024 * 1024));
+        assert!(t.in_flash(0x0800_0000));
+        assert!(t.in_flash(0x081F_FFFF));
+        assert!(!t.in_flash(0x0820_0000));
+        assert!(!t.in_flash(0x07FF_FFFF));
+    }
+
+    #[test]
+    fn plan_write_needs_a_supported_chip() {
+        let h743 = target(0x450, Some(2 * 1024 * 1024));
+        let plan = plan_write(&h743, 0x0800_0000, 16892);
+        assert_eq!(plan.map(|p| p.sectors.len()).ok(), Some(1));
+        // Unknown chip, unknown size, unsupported family (H7Ax: 8 KiB sectors).
+        assert!(plan_write(&target(0x123, Some(1 << 20)), 0x0800_0000, 32).is_err());
+        assert!(plan_write(&target(0x450, None), 0x0800_0000, 32).is_err());
+        assert!(plan_write(&target(0x480, Some(2 << 20)), 0x0800_0000, 32).is_err());
+        // F427 is not implemented yet.
+        assert!(matches!(
+            plan_write(&target(0x419, Some(2 << 20)), 0x0800_0000, 32),
+            Err(Error::Unsupported(_))
+        ));
+    }
 
     #[test]
     fn crc32_check_value() {

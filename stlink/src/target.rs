@@ -13,7 +13,7 @@ pub struct TargetInfo {
     pub core: CoreInfo,
     /// `None` if the chip id is not in the table.
     pub chip: Option<&'static ChipDescriptor>,
-    /// DBGMCU_IDCODE[11:0] (after errata fix-ups).
+    /// `DBGMCU_IDCODE[11:0]` (after errata fix-ups).
     pub chip_id: u16,
     /// Full DBGMCU_IDCODE (REV_ID in bits 31:16).
     pub idcode_raw: u32,

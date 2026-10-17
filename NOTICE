@@ -1,0 +1,14 @@
+stlink-rust-ui
+=============
+
+This project includes data derived from third-party projects.
+
+stlink (https://github.com/stlink-org/stlink), BSD 3-Clause License
+  Copyright (c) 2020, stlink-org
+  - stlink/chips/stlink/*.chip: chip description files, copied unchanged
+    from stlink v1.8.0 (config/chips). License: stlink/chips/stlink/LICENSE-stlink.md
+  - Serial-number normalization of clone probes, flash-size register quirks
+    and the connect-under-reset sequence follow stlink's behavior.
+
+OpenOCD (GPL-2.0) was consulted for ST-Link protocol knowledge only;
+no OpenOCD code is included.

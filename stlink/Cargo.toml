@@ -1,0 +1,15 @@
+[package]
+name = "stlink"
+description = "ST-Link (V2/V2-1/V3) and STM32 USB DFU access over nusb"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+nusb.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

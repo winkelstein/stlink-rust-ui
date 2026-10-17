@@ -118,7 +118,7 @@ export function LogSheet() {
         className="mono"
         role="log"
         aria-live="off"
-        style={{ flex: 1, overflow: "auto", background: "var(--logBg)", padding: "6px 0", minHeight: 0 }}
+        style={{ flex: 1, overflow: "auto", overscrollBehavior: "contain", background: "var(--logBg)", padding: "6px 0", minHeight: 0 }}
         onScroll={(e) => {
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;

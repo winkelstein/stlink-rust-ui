@@ -6,8 +6,10 @@ import { Controller } from "./state/controller";
 import { initialState } from "./state/machine";
 import { createStore } from "./state/store";
 import "./styles/tokens.css";
+import { disableZoom } from "./noZoom";
 
 if (isTauri()) document.body.classList.add("tauri");
+disableZoom();
 
 void createBackend().then(
   (backend) => {

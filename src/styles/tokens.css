@@ -1,10 +1,17 @@
 /* Tokens and shared classes — copied from docs/design/Main.dc.html (<helmet>). */
 
+/* A native window, not a page: the document never scrolls, bounces or zooms.
+   Only explicit areas scroll (screen content, the log list), with
+   `overscroll-behavior: contain` so a scroll never chains to the window. */
 html,
 body,
 #root {
   margin: 0;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
 }
 body {
   background: #d9d9de;
@@ -91,7 +98,7 @@ body.tauri {
 /* ---- Additions (not in the mockup) ---- */
 
 /* Browser: the window as a framed 920×620 like on the canvas. Tauri: full viewport. */
-.stage-page{min-height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+.stage-page{height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box;overflow:auto;overscroll-behavior:none}
 .win{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;font-size:13px;position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--bg);color:var(--text);user-select:none;-webkit-user-select:none}
 .win.framed{width:920px;height:620px;border-radius:12px;box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 22px 60px rgba(0,0,0,.28)}
 .win.native{width:100vw;height:100vh;min-width:920px;min-height:620px}

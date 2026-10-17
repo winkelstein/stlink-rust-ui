@@ -59,5 +59,5 @@ export function BannerSlot() {
   );
 }
 
-export const contentStyle = { flex: 1, minHeight: 0, overflow: "auto" } as const;
+export const contentStyle = { flex: 1, minHeight: 0, overflow: "auto", overscrollBehavior: "contain" } as const;
 export const screenStyle = { flex: 1, display: "flex", flexDirection: "column", minHeight: 0 } as const;

@@ -41,7 +41,15 @@ Only the STM32H743 is tested on hardware so far; the other families are identifi
 
 ## Install
 
-Download the installer for your OS from [Releases](https://github.com/winkelstein/stlink-rust-ui/releases) (or the artifacts of the latest [CI run](https://github.com/winkelstein/stlink-rust-ui/actions/workflows/ci.yml)).
+Download the installer for your OS, or the `stlink-cli` archive, from [Releases](https://github.com/winkelstein/stlink-rust-ui/releases). Each release has `SHA256SUMS.txt`; check it with `sha256sum -c SHA256SUMS.txt`.
+
+The same files are in [GitHub Packages](https://github.com/winkelstein/stlink-rust-ui/pkgs/container/stlink-rust-ui) as an OCI artifact:
+
+```bash
+oras pull ghcr.io/winkelstein/stlink-rust-ui:latest
+```
+
+Builds of every commit are in the artifacts of the [CI runs](https://github.com/winkelstein/stlink-rust-ui/actions/workflows/ci.yml).
 
 - **macOS**: builds are not notarized yet. Open the app the first time with right-click → Open (or System Settings → Privacy & Security → Open Anyway).
 - **Windows**: the ST-Link must use the WinUSB driver from ST ([STSW-LINK009](https://www.st.com/en/development-tools/stsw-link009.html), also installed by STM32CubeProgrammer). SmartScreen warns about unsigned builds: More info → Run anyway. Details in [docs/windows.md](docs/windows.md).

@@ -1,7 +1,7 @@
 // Bench values from the mockups: ST-Link V2 clone V2J46S7 + STM32H743.
 
 import type { ConnectOptions, Connection, LogLevel, ProbeInfo, ProbeSummary, TargetInfo } from "../types";
-import { H743_GEOMETRY } from "../../domain/geometry";
+import { H743_GEOMETRY, makeGeometry, runs } from "../../domain/geometry";
 
 export const MOCK_PROBE: ProbeInfo = {
   id: "1-1:7",
@@ -39,6 +39,85 @@ export const MOCK_TARGET: TargetInfo = {
   geometry: H743_GEOMETRY,
   rdp: "Level0",
 };
+
+/** A mock board: the dev panel switches between them. */
+export interface MockBench {
+  id: string;
+  label: string;
+  target: TargetInfo;
+}
+
+const M4 = { cpuid: 0x410f_c241, implementer: 0x41, core: "M4" as const, revision: [0, 1] as [number, number] };
+
+function bench(
+  id: string,
+  label: string,
+  chip: TargetInfo["chip"] & object,
+  core: TargetInfo["core"],
+  geometry: TargetInfo["geometry"] & object,
+  uid: string,
+): MockBench {
+  return {
+    id,
+    label,
+    target: {
+      core,
+      chip,
+      chipId: chip.chipId,
+      idcodeRaw: 0x1000_0000 | chip.chipId,
+      revId: 0x1000,
+      flashSize: geometry.size,
+      uid,
+      geometry,
+      rdp: "Level0",
+    },
+  };
+}
+
+/** Benches for the other flash families (values from the reference manuals). */
+export const BENCHES: MockBench[] = [
+  { id: "h743", label: "H743", target: MOCK_TARGET },
+  bench(
+    "f103c8",
+    "F103C8",
+    { chipId: 0x410, devType: "STM32F1xx_MD", flashType: "F0_F1_F3", flashPagesize: 0x400, sramSize: 0x5000, dualBank: false },
+    { cpuid: 0x411f_c231, implementer: 0x41, core: "M3", revision: [1, 1] },
+    makeGeometry(0x0800_0000, [runs("64x1")], "page", 2),
+    "0566FF323535474B43132733",
+  ),
+  bench(
+    "f411ce",
+    "F411CE",
+    { chipId: 0x431, devType: "STM32F411xC_xE", flashType: "F2_F4", flashPagesize: 0x4000, sramSize: 0x20000, dualBank: false },
+    M4,
+    makeGeometry(0x0800_0000, [runs("4x16 1x64 3x128")], "sector", 4),
+    "0032003A3436510F37363934",
+  ),
+  bench(
+    "f427",
+    "F427",
+    { chipId: 0x419, devType: "STM32F42x_F43x", flashType: "F2_F4", flashPagesize: 0x4000, sramSize: 0x40000, dualBank: false },
+    M4,
+    makeGeometry(0x0800_0000, [runs("4x16 1x64 7x128"), runs("4x16 1x64 7x128")], "sector", 4),
+    "002900243133511337303733",
+  ),
+  bench(
+    "g474",
+    "G474",
+    { chipId: 0x469, devType: "STM32G47x_G48x", flashType: "G4", flashPagesize: 0x800, sramSize: 0x20000, dualBank: false },
+    M4,
+    makeGeometry(0x0800_0000, [runs("128x2"), runs("128x2")], "page", 8),
+    "002E00403133511138363631",
+  ),
+  bench(
+    "f746",
+    "F746",
+    { chipId: 0x449, devType: "STM32F74x_F75x", flashType: "F7", flashPagesize: 0x800, sramSize: 0x50000, dualBank: false },
+    { cpuid: 0x410f_c271, implementer: 0x41, core: "M7", revision: [0, 1] },
+    makeGeometry(0x0800_0000, [runs("4x32 1x128 3x256")], "sector", 4),
+    "0035001E3436510634383634",
+  ),
+];
 
 export function mockConnection(opts: ConnectOptions): Connection {
   return {

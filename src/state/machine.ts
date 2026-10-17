@@ -405,7 +405,7 @@ export function reducer(s: AppState, a: Action): AppState {
     case "eraseStarted": {
       if (s.op || !s.session || s.screen !== "eraseConfirm") return s;
       const g = s.session.target.geometry;
-      const banks = g ? Math.max(1, Math.round(g.size / Math.max(1, g.bankSize))) : 1;
+      const banks = g ? Math.max(1, g.banks.length) : 1;
       return {
         ...s,
         screen: "eraseProgress",

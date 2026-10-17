@@ -3,6 +3,7 @@ import type { Controller } from "../state/controller";
 import type { AppState } from "../state/machine";
 import { chipShortName, probeModelName } from "../domain/chipNames";
 import { useT } from "../i18n";
+import { speedFor, type FamilySpeed } from "../domain/estimate";
 import { StatusChip } from "../components/StatusChip";
 import { ErrorBanner } from "../components/ErrorBanner";
 
@@ -31,6 +32,12 @@ export function useNow(ms: number, wall = false): number {
     return () => clearInterval(t);
   }, [ms, wall]);
   return now;
+}
+
+/** Time estimates of the connected chip's flash family. */
+export function useSpeed(): FamilySpeed {
+  const { s } = useApp();
+  return speedFor(s.session?.target.chip?.flashType);
 }
 
 /** `ST-Link V2 · STM32H743 · 3.28 V` */

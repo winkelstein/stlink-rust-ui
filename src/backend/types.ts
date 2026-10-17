@@ -82,12 +82,28 @@ export interface ChipInfo {
   dualBank: boolean;
 }
 
-/** `flash::geometry::FlashGeometry`. */
+/** `flash::geometry::EraseUnit`: what the erase unit is called. */
+export type EraseUnit = "page" | "sector";
+
+/** `count` units of `size` bytes. */
+export interface SectorRun {
+  count: number;
+  size: number;
+}
+
+/** `flash::geometry::FlashBank`. */
+export interface FlashBank {
+  base: number;
+  size: number;
+  runs: SectorRun[];
+}
+
+/** `flash::geometry::FlashGeometry`: banks of page/sector runs (sizes may differ). */
 export interface FlashGeometry {
   base: number;
   size: number;
-  bankSize: number;
-  sectorSize: number;
+  banks: FlashBank[];
+  unit: EraseUnit;
   writeGranularity: number;
   erasedValue: number;
 }
@@ -117,12 +133,13 @@ export interface DeviceSession {
   target: TargetInfo;
 }
 
-/** `flash::geometry::Sector`. */
+/** `flash::geometry::Sector`: one page or sector. */
 export interface Sector {
   bank: number;
   /** Index within the bank. */
   index: number;
   addr: number;
+  size: number;
 }
 
 /** `flash::geometry::WritePlan` plus the unpadded length. */

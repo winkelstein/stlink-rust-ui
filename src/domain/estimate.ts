@@ -1,32 +1,64 @@
-// Speeds measured on the bench (H743 @ 4 MHz SWD, CLAUDE.md) and the
-// time estimates / overall progress derived from them.
+// Time estimates per flash family, and the overall progress derived from them.
+// H7 values are measured on the bench (H743 @ 4 MHz SWD, CLAUDE.md); the other
+// families use conservative guesses until measured (docs/hardware-checklist.md).
 
 import type { FlashPlan, Progress, WriteStage } from "../backend/types";
 
-export const SPEED = {
-  /** Seconds per 128 KB sector. */
-  eraseSector: 0.95,
-  /** Seconds per MB of bank erase (mass erase: H743, 5.5 s per 1 MB bank). */
-  eraseBankPerMb: 5.5,
+const KIB = 1024;
+
+export interface FamilySpeed {
+  /** Seconds to erase one page/sector of `size` bytes. */
+  eraseUnit: (size: number) => number;
+  /** Seconds per MB of bank erase (mass erase). */
+  eraseBankPerMb: number;
   /** Bytes per second. */
-  program: 137 * 1024,
-  verify: 148 * 1024,
-  read: 148 * 1024,
-} as const;
+  program: number;
+  verify: number;
+  read: number;
+}
+
+/** H74x/H75x: measured (0.95 s per 128 KB sector, 5.5 s per 1 MB bank). */
+const H7: FamilySpeed = {
+  eraseUnit: (size) => 0.95 * (size / (128 * KIB)),
+  eraseBankPerMb: 5.5,
+  program: 137 * KIB,
+  verify: 148 * KIB,
+  read: 148 * KIB,
+};
+
+const BY_FLASH_TYPE: Record<string, FamilySpeed> = {
+  H7,
+  // TODO(measure): F0/F1/F3 — page erase ≤ 40 ms plus USB round trips, halfword programming.
+  F0_F1_F3: { eraseUnit: () => 0.06, eraseBankPerMb: 1, program: 20 * KIB, verify: 100 * KIB, read: 100 * KIB },
+  F1_XL: { eraseUnit: () => 0.06, eraseBankPerMb: 1, program: 20 * KIB, verify: 100 * KIB, read: 100 * KIB },
+  // TODO(measure): F2/F4/F7 — sector erase ≈ 0.3 s + 13 ms/KB (x32), bank erase up to 16 s/MB.
+  F2_F4: { eraseUnit: (size) => 0.3 + (size / KIB) * 0.013, eraseBankPerMb: 12, program: 60 * KIB, verify: 120 * KIB, read: 120 * KIB },
+  F7: { eraseUnit: (size) => 0.3 + (size / KIB) * 0.013, eraseBankPerMb: 12, program: 60 * KIB, verify: 120 * KIB, read: 120 * KIB },
+  // TODO(measure): G4 — page erase ≤ 40 ms, double-word programming.
+  G4: { eraseUnit: () => 0.06, eraseBankPerMb: 1, program: 50 * KIB, verify: 120 * KIB, read: 120 * KIB },
+};
+
+/** Speeds of a flash family (`ChipInfo.flashType`); H7 when unknown. */
+export function speedFor(flashType: string | null | undefined): FamilySpeed {
+  return (flashType && BY_FLASH_TYPE[flashType]) || H7;
+}
+
+/** The bench (H743) speeds, kept for callers without a chip. */
+export const SPEED = H7;
 
 export const WRITE_STAGES: readonly WriteStage[] = ["erasing", "programming", "verifying"];
 
 export type WriteEstimate = Record<WriteStage, number> & { total: number };
 
-export function estimateWrite(plan: FlashPlan, verify: boolean): WriteEstimate {
-  const erasing = plan.sectors.length * SPEED.eraseSector;
-  const programming = plan.paddedLen / SPEED.program;
-  const verifying = verify ? plan.paddedLen / SPEED.verify : 0;
+export function estimateWrite(plan: FlashPlan, verify: boolean, speed: FamilySpeed = H7): WriteEstimate {
+  const erasing = plan.sectors.reduce((t, s) => t + speed.eraseUnit(s.size), 0);
+  const programming = plan.paddedLen / speed.program;
+  const verifying = verify ? plan.paddedLen / speed.verify : 0;
   return { erasing, programming, verifying, total: erasing + programming + verifying };
 }
 
-export function estimateRead(size: number): number {
-  return size / SPEED.read;
+export function estimateRead(size: number, speed: FamilySpeed = H7): number {
+  return size / speed.read;
 }
 
 /**
@@ -58,6 +90,6 @@ export function remainingSeconds(estTotal: number, fraction: number, elapsedS: n
 }
 
 /** Expected seconds to erase one bank of `bankSize` bytes. */
-export function estimateBankErase(bankSize: number): number {
-  return (bankSize / (1024 * 1024)) * SPEED.eraseBankPerMb;
+export function estimateBankErase(bankSize: number, speed: FamilySpeed = H7): number {
+  return (bankSize / (1024 * 1024)) * speed.eraseBankPerMb;
 }

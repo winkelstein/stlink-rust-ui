@@ -24,17 +24,18 @@ import {
   type WriteResult,
   type WriteStage,
 } from "../types";
-import { H743_GEOMETRY, planWrite } from "../../domain/geometry";
+import { planWrite } from "../../domain/geometry";
 import { crc32 } from "../../domain/crc32";
-import { SPEED, estimateBankErase } from "../../domain/estimate";
+import { estimateBankErase, speedFor, type FamilySpeed } from "../../domain/estimate";
 import { DEFAULT_QUICK, migrateQuick } from "../../domain/quickWrite";
 import {
+  BENCHES,
   DEMO_FILE,
   MOCK_LOG,
   MOCK_MESSAGES,
   MOCK_PROBE,
   MOCK_SUMMARY,
-  MOCK_TARGET,
+  type MockBench,
   MOCK_UID,
   mockConnection,
   synthFirmware,
@@ -51,6 +52,8 @@ export interface MockControlsState {
   nextFault: MockFault | null;
   speed: number;
   watchedFiles: number;
+  /** Id of the board (`BENCHES`). */
+  bench: string;
 }
 
 const STORAGE_PREFIX = "stlink-ui.quick.";
@@ -105,7 +108,8 @@ export class MockBackend implements Backend {
   private deviceListeners = new Set<(e: DeviceEvent) => void>();
   private fileWatchers = new Map<string, Set<(f: BinFile) => void>>();
   private files = new Map<string, StoredFile>();
-  private flash = new Uint8Array(H743_GEOMETRY.size).fill(H743_GEOMETRY.erasedValue);
+  private bench: MockBench = BENCHES[0];
+  private flash = new Uint8Array(0);
   private nextFault: MockFault | null = null;
   private speed = 1;
   private controlListeners = new Set<() => void>();
@@ -119,7 +123,7 @@ export class MockBackend implements Backend {
 
   constructor() {
     const demo = synthFirmware(DEMO_FILE.name, DEMO_FILE.size);
-    this.flash.set(demo, 0);
+    this.loadBench(BENCHES[0]);
     this.seedQuickWrite(demo);
     this.settings = this.readSettings();
     for (const [clock, level, message] of MOCK_LOG) this.push(level, message, todayAt(clock));
@@ -143,6 +147,16 @@ export class MockBackend implements Backend {
     setSpeed: (s: number) => {
       this.speed = s;
       this.emitControls();
+    },
+    /** Another board on the probe: unplug, swap, plug in again. */
+    setBench: (id: string) => {
+      const next = BENCHES.find((b) => b.id === id);
+      if (!next || next === this.bench) return;
+      const wasConnected = this.connected;
+      if (wasConnected) this.setConnected(false);
+      this.loadBench(next);
+      this.emitControls();
+      if (wasConnected) setTimeout(() => this.setConnected(true), 400);
     },
     /** Rebuild of every watched file: a few writes in a row, like a linker. */
     touchWatchedFiles: (changeContent: boolean) => {
@@ -176,7 +190,26 @@ export class MockBackend implements Backend {
       nextFault: this.nextFault,
       speed: this.speed,
       watchedFiles: this.fileWatchers.size,
+      bench: this.bench.id,
     };
+  }
+
+  /** The bench's flash: erased, with the demo firmware where it fits (H743). */
+  private loadBench(b: MockBench) {
+    this.bench = b;
+    const g = this.geometry;
+    this.flash = new Uint8Array(g.size).fill(g.erasedValue);
+    if (b.id === "h743") this.flash.set(synthFirmware(DEMO_FILE.name, DEMO_FILE.size), 0);
+  }
+
+  private get geometry() {
+    const g = this.bench.target.geometry;
+    if (!g) throw new Error("mock bench without geometry");
+    return g;
+  }
+
+  private get family(): FamilySpeed {
+    return speedFor(this.bench.target.chip?.flashType);
   }
 
   private emitControls() {
@@ -275,7 +308,7 @@ export class MockBackend implements Backend {
     this.log("INFO", `opened ST-Link V2 ${MOCK_PROBE.descriptor.serial} version=V2J46S7`, "stlink::probe");
     this.log("INFO", `SWD clock ${opts.swdKhz} kHz`, "stlink::probe");
     this.log("INFO", `chip chip_id=0x450 dev_type="STM32H74x_H75x"`, "stlink::target");
-    return { probe: MOCK_PROBE, connection: mockConnection(opts), target: MOCK_TARGET };
+    return { probe: MOCK_PROBE, connection: mockConnection(opts), target: this.bench.target };
   }
 
   async disconnect(probeId: ProbeId): Promise<void> {
@@ -287,7 +320,7 @@ export class MockBackend implements Backend {
 
   async planWrite(probeId: ProbeId, addr: number, len: number): Promise<FlashPlan> {
     this.ensureOpen(probeId);
-    const r = planWrite(H743_GEOMETRY, addr, len);
+    const r = planWrite(this.geometry, addr, len);
     if (!r.ok) {
       const msg: Record<typeof r.error, string> = {
         empty: "invalid argument: nothing to write",
@@ -311,7 +344,8 @@ export class MockBackend implements Backend {
     await this.sleep(120, o.signal);
     if (fault && fault !== "Disconnected") throw this.faultError(fault);
 
-    const g = H743_GEOMETRY;
+    const g = this.geometry;
+    const speed = this.family;
     const image = new Uint8Array(plan.paddedLen).fill(g.erasedValue);
     image.set(data);
     const off = plan.addr - g.base;
@@ -324,9 +358,9 @@ export class MockBackend implements Backend {
     const n = plan.sectors.length;
     o.onProgress({ stage: "erasing", done: 0, total: n });
     for (let i = 0; i < n; i++) {
-      await this.sleep(SPEED.eraseSector * 1000, o.signal);
       const s = plan.sectors[i];
-      this.flash.fill(g.erasedValue, s.addr - g.base, s.addr - g.base + g.sectorSize);
+      await this.sleep(speed.eraseUnit(s.size) * 1000, o.signal);
+      this.flash.fill(g.erasedValue, s.addr - g.base, s.addr - g.base + s.size);
       o.onProgress({ stage: "erasing", done: i + 1, total: n });
     }
     stageMs.erasing = performance.now() - t0;
@@ -337,7 +371,7 @@ export class MockBackend implements Backend {
     o.onProgress({ stage: "programming", done: 0, total });
     for (let done = 0; done < total; ) {
       const k = Math.min(BLOCK, total - done);
-      await this.sleep((k / SPEED.program) * 1000, o.signal);
+      await this.sleep((k / speed.program) * 1000, o.signal);
       this.flash.set(image.subarray(done, done + k), off + done);
       this.trace([0xf2, 0x08], "WRITEMEM_32BIT", [0x80], "OK");
       done += k;
@@ -355,7 +389,7 @@ export class MockBackend implements Backend {
       o.onProgress({ stage: "verifying", done: 0, total });
       for (let done = 0; done < total; ) {
         const k = Math.min(BLOCK, total - done);
-        await this.sleep((k / SPEED.verify) * 1000, o.signal);
+        await this.sleep((k / speed.verify) * 1000, o.signal);
         done += k;
         o.onProgress({ stage: "verifying", done, total });
       }
@@ -381,8 +415,8 @@ export class MockBackend implements Backend {
     await this.sleep(80, o.signal);
     if (fault === "FlashProtected" || fault === "Busy") throw this.faultError(fault);
 
-    const g = H743_GEOMETRY;
-    const banks = Math.round(g.size / g.bankSize);
+    const g = this.geometry;
+    const banks = g.banks.length;
     const started = performance.now();
     const bankMs: number[] = [];
     this.log("INFO", `mass erase: ${banks} bank(s)`, "stlink::flash");
@@ -390,13 +424,16 @@ export class MockBackend implements Backend {
     for (let b = 0; b < banks; b++) {
       const t0 = performance.now();
       // A bank erase reports nothing until it ends; cancel only between banks.
-      await this.sleep(estimateBankErase(g.bankSize) * 1000);
-      if (b === 1 && fault === "Disconnected") {
+      const bank = g.banks[b];
+      await this.sleep(estimateBankErase(bank.size, this.family) * 1000);
+      // Faults hit the second bank (the only one on single-bank chips).
+      const faultBank = Math.min(1, banks - 1);
+      if (b === faultBank && fault === "Disconnected") {
         this.setConnected(false);
         throw this.faultError("Disconnected");
       }
-      if (b === 1 && fault === "EraseFault") throw this.faultError("EraseFault");
-      this.flash.fill(g.erasedValue, b * g.bankSize, (b + 1) * g.bankSize);
+      if (b === faultBank && fault === "EraseFault") throw this.faultError("EraseFault");
+      this.flash.fill(g.erasedValue, bank.base - g.base, bank.base - g.base + bank.size);
       bankMs.push(performance.now() - t0);
       this.log("DEBUG", `bank ${b + 1} erased`, "stlink::flash");
       o.onProgress({ stage: "erasing", done: b + 1, total: banks });
@@ -413,13 +450,13 @@ export class MockBackend implements Backend {
     await this.sleep(80, o.signal);
     if (fault && fault !== "Disconnected") throw this.faultError(fault);
 
-    const g = H743_GEOMETRY;
+    const g = this.geometry;
     const out = new Uint8Array(job.size);
     const started = performance.now();
     o.onProgress({ stage: "reading", done: 0, total: job.size });
     for (let done = 0; done < job.size; ) {
       const k = Math.min(BLOCK, job.size - done);
-      await this.sleep((k / SPEED.read) * 1000, o.signal);
+      await this.sleep((k / this.family.read) * 1000, o.signal);
       for (let i = 0; i < k; i++) {
         const a = job.addr + done + i - g.base;
         out[done + i] = a >= 0 && a < g.size ? this.flash[a] : 0;

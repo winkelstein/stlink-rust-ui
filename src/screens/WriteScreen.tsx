@@ -5,11 +5,11 @@ import { describeRuns, FlashMap } from "../components/FlashMap";
 import { Footer, Spacer } from "../components/Footer";
 import { estimateWrite } from "../domain/estimate";
 import { fmtClock, fmtRange } from "../domain/format";
-import { planWrite, sectorRuns } from "../domain/geometry";
+import { bytesOf, planWrite, sectorRuns } from "../domain/geometry";
 import { parseNumber, writeAddrHint } from "../domain/validate";
 import { useT } from "../i18n";
 import { isBusy } from "../state/machine";
-import { BannerSlot, contentStyle, DeviceChip, screenStyle, useApp } from "./shared";
+import { BannerSlot, contentStyle, DeviceChip, screenStyle, useApp, useSpeed } from "./shared";
 
 const HINT_COLOR = { ok: "var(--ok)", warn: "var(--warn)", error: "var(--warn)" } as const;
 
@@ -25,7 +25,8 @@ export function WriteScreen() {
   const plan = res?.ok ? res.plan : null;
   const hint = g ? writeAddrHint(tr, g, f.addrText, file?.size ?? null) : null;
   const { verify, resetAfter } = s.settings;
-  const est = plan ? estimateWrite(plan, verify) : null;
+  const speed = useSpeed();
+  const est = plan ? estimateWrite(plan, verify, speed) : null;
   const canWrite = !!plan && !isBusy(s) && s.screen === "write";
   const dispatch = ctl.store.dispatch;
   const fileInfo = file ? t.fileMeta(fm.size(file.size), fm.int(file.size), fmtClock(file.modifiedAt)) : t.chooseBin;
@@ -150,20 +151,20 @@ function Confirm() {
   const g = s.session?.target.geometry;
   if (!c || !g) return null;
   const sectors = c.pending.plan.sectors;
-  const runs = sectorRuns(g, sectors);
+  const runs = sectorRuns(sectors);
   const n = sectors.length;
-  const what = describeRuns(t, runs, true);
+  const what = describeRuns(t, runs, g.unit, true);
   const first = runs[0];
   const last = runs[runs.length - 1];
   return (
     <ConfirmSheet
-      title={t.cfTitle(n)}
+      title={t.cfTitle(n, g.unit)}
       confirmLabel={t.eraseWrite}
       onConfirm={() => ctl.confirmWrite()}
       onCancel={() => ctl.cancelConfirm()}
     >
       {what.charAt(0).toUpperCase() + what.slice(1)} (
-      <span className="mono">{fmtRange(first.addr, last.end - first.addr)}</span>, {f.size(n * g.sectorSize)}) {t.cf2(n)}
+      <span className="mono">{fmtRange(first.addr, last.end - first.addr)}</span>, {f.size(bytesOf(sectors))}) {t.cf2(n, g.unit)}
     </ConfirmSheet>
   );
 }

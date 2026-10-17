@@ -3,12 +3,12 @@ import { Footer, Spacer } from "../components/Footer";
 import { CheckSmallIcon, WarnIcon } from "../components/Icons";
 import { ProgressBar } from "../components/ProgressBar";
 import { chipShortName } from "../domain/chipNames";
-import { estimateBankErase, estimateWrite, remainingSeconds, SPEED, WRITE_STAGES, writeFraction } from "../domain/estimate";
+import { estimateBankErase, estimateWrite, remainingSeconds, WRITE_STAGES, writeFraction } from "../domain/estimate";
 import { fmtHex32, fmtRange } from "../domain/format";
-import { bankCount, sectorsPerBank } from "../domain/geometry";
+import { bankCount, bankSize, unitsInBank } from "../domain/geometry";
 import { useT } from "../i18n";
 import type { WriteStage } from "../backend/types";
-import { screenStyle, useApp, useNow } from "./shared";
+import { screenStyle, useApp, useNow, useSpeed } from "./shared";
 
 interface StageRow {
   key: string;
@@ -96,14 +96,18 @@ export function WriteProgressScreen() {
   if (!op || !s.session) return null;
   const { plan, job, file } = op.pending;
   const p = op.progress;
-  const est = estimateWrite(plan, job.verify);
+  const speed = useSpeed();
+  const unit = s.session.target.geometry?.unit ?? "sector";
+  const est = estimateWrite(plan, job.verify, speed);
   const idx = WRITE_STAGES.indexOf(p.stage as WriteStage);
   const stageStart = (st: WriteStage) => op.stageStart[st] ?? op.startedAt;
 
   // Erase reports once per sector (~1 s): interpolate inside the current one.
   let frac = p.total > 0 ? p.done / p.total : 0;
   if (p.stage === "erasing" && p.total > 0 && p.done < p.total) {
-    const perSector = p.done > 0 ? (op.lastProgressAt - stageStart("erasing")) / p.done : SPEED.eraseSector * 1000;
+    const next = plan.sectors[p.done];
+    const perSector =
+      p.done > 0 ? (op.lastProgressAt - stageStart("erasing")) / p.done : speed.eraseUnit(next?.size ?? 0) * 1000;
     frac = (p.done + Math.min(0.95, (now - op.lastProgressAt) / Math.max(1, perSector))) / p.total;
   }
   const total = writeFraction(est, p, frac);
@@ -116,7 +120,7 @@ export function WriteProgressScreen() {
   };
   const rate = () => {
     const sec = (now - stageStart(p.stage as WriteStage)) / 1000;
-    return f.rate(sec > 0.3 ? p.done / sec : SPEED.program);
+    return f.rate(sec > 0.3 ? p.done / sec : speed.program);
   };
   const n = plan.sectors.length;
   const labels = [t.stErase, t.stProgram, t.stVerify];
@@ -129,11 +133,11 @@ export function WriteProgressScreen() {
     if (skipped) detail = t.stOff;
     else if (isDone) {
       const sec = f.seconds(stageSeconds(st, i));
-      detail = [`${t.sectorsN(n)} · ${sec}`, `${f.size(plan.len)} · ${sec}`, `${t.stMatch} · ${sec}`][i];
+      detail = [`${t.unitsN(n, unit)} · ${sec}`, `${f.size(plan.len)} · ${sec}`, `${t.stMatch} · ${sec}`][i];
     } else if (isActive) {
       const stPct = Math.round(frac * 100);
       detail = [
-        t.sectorOf(Math.min(n, p.done + 1), n),
+        t.unitOf(Math.min(n, p.done + 1), n, unit),
         t.kbOf(stPct, Math.round(p.done / 1024), Math.round(p.total / 1024), rate()),
         `${stPct} %`,
       ][i];
@@ -168,6 +172,7 @@ export function WriteProgressScreen() {
 export function EraseProgressScreen() {
   const { s, ctl } = useApp();
   const { t, f } = useT();
+  const speed = useSpeed();
   const now = useNow(100);
   const op = s.op?.kind === "erase" ? s.op : null;
   const g = s.session?.target.geometry;
@@ -175,21 +180,22 @@ export function EraseProgressScreen() {
   const banks = Math.max(1, op.progress.total || bankCount(g));
   const done = op.progress.done;
   const measured = done > 0 ? (op.bankStart[done] - op.bankStart[0]) / done / 1000 : 0;
-  const perBank = measured > 0 ? measured : estimateBankErase(g.bankSize);
+  const bank = Math.min(done, g.banks.length - 1);
+  const perBank = measured > 0 ? measured : estimateBankErase(bankSize(g, bank), speed);
   const current = op.bankStart[done] ?? op.startedAt;
   const inBank = done < banks ? Math.min(0.97, (now - current) / 1000 / perBank) : 0;
   const total = Math.min(1, (done + inBank) / banks);
   const left = remainingSeconds(perBank * banks, total, (now - op.startedAt) / 1000);
-  const perBankSectors = sectorsPerBank(g);
+  const perBankUnits = unitsInBank(g, bank);
 
   const stages: StageRow[] = Array.from({ length: banks }, (_, i) => {
     const isDone = i < done;
     const isActive = i === done;
     const sec = isDone ? (op.bankStart[i + 1] - op.bankStart[i]) / 1000 : 0;
     const detail = isDone
-      ? `${f.size(g.bankSize)} · ${f.seconds(sec)}`
+      ? `${f.size(bankSize(g, i))} · ${f.seconds(sec)}`
       : isActive
-        ? t.sectorOf(Math.min(perBankSectors, Math.floor(inBank * perBankSectors) + 1), perBankSectors)
+        ? t.unitOf(Math.min(perBankUnits, Math.floor(inBank * perBankUnits) + 1), perBankUnits, g.unit)
         : t.stWaiting;
     return { key: `b${i}`, label: t.bankN(i + 1), detail, isDone, isActive, isPending: i > done, frac: inBank };
   });

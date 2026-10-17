@@ -61,14 +61,15 @@ export function writeAddrHint(tr: I18n, g: FlashGeometry, text: string, len: num
   if (!res.ok) return { tone: "error", text: planErrorText(tr, g, res.error, addr, len ?? 0) };
   const bank = bankOf(g, addr);
   const sector = sectorOf(g, addr);
+  if (!sector) return { tone: "error", text: planErrorText(tr, g, "outside", addr, len ?? 0) };
   const where =
     addr === g.base
       ? t.addrFlashStart(bank + 1)
       : addr === bankBase(g, bank)
         ? t.addrBankStart(bank + 1)
-        : t.addrSector(sector.index, bank + 1);
-  if (sector.addr === addr) return { tone: "ok", text: t.addrAligned(where) };
-  return { tone: "warn", text: t.addrUnaligned(where, fmtHex32(sector.addr)) };
+        : t.addrUnit(sector.index, bank + 1, g.unit);
+  if (sector.addr === addr) return { tone: "ok", text: t.addrAligned(where, g.unit) };
+  return { tone: "warn", text: t.addrUnaligned(where, fmtHex32(sector.addr), g.unit) };
 }
 
 export type ReadCheckError = "start" | "size" | "outside" | "tooBig" | "unknown";

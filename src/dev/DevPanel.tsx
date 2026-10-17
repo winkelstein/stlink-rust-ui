@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { MockBackend, MockFault } from "../backend/mock/MockBackend";
+import { BENCHES } from "../backend/mock/mockData";
 import type { LangSetting } from "../backend/types";
 import { Button } from "../components/Button";
 import { Segmented } from "../components/Segmented";
@@ -30,7 +31,7 @@ const LANGS: { value: LangSetting; label: string }[] = [
   { value: "en", label: "EN" },
 ];
 
-/** Mock-only controls (⌥⌘D / Ctrl+Alt+D): hot-plug, file changes, injected errors, speed, language. */
+/** Mock-only controls (⌥⌘D / Ctrl+Alt+D): hot-plug, board, file changes, injected errors, speed, language. */
 export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Controller; onClose: () => void }) {
   const c = mock.controls;
   const st = useSyncExternalStore(c.subscribe, c.getState);
@@ -71,6 +72,17 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
         <span style={{ color: "var(--text2)" }}>
           {st.connected ? (st.opened ? "connected to the app" : "found, not opened") : "none"}
         </span>
+      </div>
+      <div style={row}>
+        <span style={label}>Board</span>
+        <div style={{ flex: 1 }}>
+          <Segmented
+            label="Board on the probe"
+            value={st.bench}
+            options={BENCHES.map((b) => ({ value: b.id, label: b.label }))}
+            onChange={(id) => c.setBench(id)}
+          />
+        </div>
       </div>
       <div style={row}>
         <span style={label}>Busy</span>

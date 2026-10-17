@@ -4,7 +4,7 @@ import { FolderIcon } from "../components/Icons";
 import { KeyValue } from "../components/KeyValue";
 import { ProgressBar } from "../components/ProgressBar";
 import { Segmented } from "../components/Segmented";
-import { estimateRead, remainingSeconds, SPEED } from "../domain/estimate";
+import { estimateRead, remainingSeconds } from "../domain/estimate";
 import { fmtHex32, fmtRange } from "../domain/format";
 import { checkReadRange, fmtMax, parseNumber, readCheckText } from "../domain/validate";
 import { readableFlash } from "../domain/geometry";
@@ -13,7 +13,7 @@ import { PLATFORM } from "../platform";
 import { isBusy, type ReadRange } from "../state/machine";
 import { availableRanges } from "../state/readRange";
 import { DoneMark } from "./WriteDoneScreen";
-import { BannerSlot, contentStyle, DeviceChip, screenStyle, useApp, useNow } from "./shared";
+import { BannerSlot, contentStyle, DeviceChip, screenStyle, useApp, useNow, useSpeed } from "./shared";
 
 function rangeLabel(t: Dict, r: ReadRange): string {
   return { all: t.rangeAll, b1: t.bank1, b2: t.bank2, custom: t.rangeCustom }[r];
@@ -21,6 +21,7 @@ function rangeLabel(t: Dict, r: ReadRange): string {
 
 export function ReadScreen() {
   const { s, ctl } = useApp();
+  const speed = useSpeed();
   const tr = useT();
   const { t, f: fm } = tr;
   const g = s.session?.target.geometry;
@@ -109,7 +110,7 @@ export function ReadScreen() {
         </section>
         <div style={{ fontSize: 12, color: "var(--text2)" }}>
           {check.ok
-            ? t.readEstimate(Math.max(1, Math.round(estimateRead(check.size))), fm.size(check.size), fm.rate(SPEED.read))
+            ? t.readEstimate(Math.max(1, Math.round(estimateRead(check.size, speed))), fm.size(check.size), fm.rate(speed.read))
             : t.enterRange}
         </div>
       </div>
@@ -134,8 +135,9 @@ export function ReadProgressScreen() {
   const p = op.progress;
   const frac = p.total > 0 ? p.done / p.total : 0;
   const elapsed = (now - op.startedAt) / 1000;
-  const left = remainingSeconds(estimateRead(p.total), frac, elapsed);
-  const speed = elapsed > 0.3 && p.done > 0 ? p.done / elapsed : SPEED.read;
+  const family = useSpeed();
+  const left = remainingSeconds(estimateRead(p.total, family), frac, elapsed);
+  const speed = elapsed > 0.3 && p.done > 0 ? p.done / elapsed : family.read;
   return (
     <div style={screenStyle}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, padding: "24px 120px" }}>

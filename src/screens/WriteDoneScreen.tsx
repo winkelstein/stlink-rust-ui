@@ -3,6 +3,7 @@ import { Footer, Spacer } from "../components/Footer";
 import { CheckLargeIcon } from "../components/Icons";
 import { KeyValue } from "../components/KeyValue";
 import { fmtHex32, fmtRange } from "../domain/format";
+import { bytesOf } from "../domain/geometry";
 import { useT } from "../i18n";
 import { isBusy } from "../state/machine";
 import { DeviceChip, screenStyle, useApp } from "./shared";
@@ -43,7 +44,7 @@ export function WriteDoneScreen() {
   if (!w) return null;
   const { result, pending } = w;
   const n = result.plan.sectors.length;
-  const sectorSize = s.session?.target.geometry?.sectorSize ?? 0;
+  const unit = s.session?.target.geometry?.unit ?? "sector";
   return (
     <div style={screenStyle}>
       <div style={centered}>
@@ -56,7 +57,7 @@ export function WriteDoneScreen() {
           <KeyValue k={t.region} mono>
             {fmtRange(result.plan.addr, result.plan.len)}
           </KeyValue>
-          <KeyValue k={t.erased}>{t.erasedVal(n, f.size(n * sectorSize))}</KeyValue>
+          <KeyValue k={t.erased}>{t.erasedVal(n, f.size(bytesOf(result.plan.sectors)), unit)}</KeyValue>
           <KeyValue k="CRC32" mono>
             {fmtHex32(result.crc32)}
           </KeyValue>

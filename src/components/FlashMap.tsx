@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
-import type { FlashGeometry, FlashPlan } from "../backend/types";
-import { allSectors, bankBase, bankCount, sectorRuns, type SectorRun } from "../domain/geometry";
+import type { EraseUnit, FlashGeometry, FlashPlan } from "../backend/types";
+import { bankBase, bankCount, bytesOf, mapBlocks, sectorRuns, type SectorRun } from "../domain/geometry";
 import { fmtHex32, fmtRange } from "../domain/format";
 import { useT, type Dict } from "../i18n";
 
-/** `sectors 0–1, bank 1`, `sector 7 of bank 1 and 0 of bank 2`. */
-export function describeRuns(t: Dict, runs: readonly SectorRun[], longForm = false): string {
+/** `sectors 0–1, bank 1`, `page 7 of bank 1 and 0 of bank 2`. */
+export function describeRuns(t: Dict, runs: readonly SectorRun[], unit: EraseUnit, longForm = false): string {
   const many = runs.some((r) => r.first !== r.last) || runs.length > 1;
   const items = runs.map((r) => ({
     span: r.first === r.last ? `${r.first}` : `${r.first}–${r.last}`,
     bank: r.bank + 1,
     many: r.first !== r.last,
   }));
-  return t.runs(items, many, longForm);
+  return t.runs(items, many, longForm, unit);
 }
 
 interface Props {
@@ -23,21 +23,25 @@ interface Props {
 
 export function FlashMap({ geometry: g, plan, children }: Props) {
   const { t, f } = useT();
-  const sectors = allSectors(g);
-  const erase = new Set(plan?.sectors.map((s) => s.addr) ?? []);
-  const erasedBytes = (plan?.sectors.length ?? 0) * g.sectorSize;
-  const runs = plan ? sectorRuns(g, plan.sectors) : [];
+  // Hundreds of pages (F1, G4) are grouped; a block is marked if any of its
+  // units will be erased. Widths follow the bytes (F4: 16 to 128 KiB sectors).
+  const blocks = mapBlocks(g);
+  const erasedAddrs = plan?.sectors.map((s) => s.addr) ?? [];
+  const willErase = (addr: number, size: number) => erasedAddrs.some((a) => a >= addr && a < addr + size);
+  const erasedBytes = plan ? bytesOf(plan.sectors) : 0;
+  const runs = plan ? sectorRuns(plan.sectors) : [];
   const banks = Array.from({ length: bankCount(g) }, (_, i) => i);
   return (
     <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div className="eyebrow">{t.map(f.size(g.size))}</div>
       <div style={{ position: "relative" }}>
         <div style={{ display: "flex", gap: 3 }}>
-          {sectors.map((s) => (
+          {blocks.map((b) => (
             <div
-              key={s.addr}
-              className={erase.has(s.addr) ? "sec erase" : "sec"}
-              title={t.sectorTitle(s.bank + 1, s.index, fmtHex32(s.addr))}
+              key={b.addr}
+              className={willErase(b.addr, b.size) ? "sec erase" : "sec"}
+              style={{ flex: `${b.size} 1 0`, minWidth: 2 }}
+              title={t.mapTitle(b.bank + 1, b.first, b.last, fmtHex32(b.addr), g.unit)}
             />
           ))}
         </div>
@@ -77,7 +81,7 @@ export function FlashMap({ geometry: g, plan, children }: Props) {
           <>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <span className="sw" style={{ background: "var(--warnSoft)", boxShadow: "inset 0 0 0 1px var(--warnFill)" }} />
-              <span style={{ flex: 1 }}>{t.willErase(describeRuns(t, runs))}</span>
+              <span style={{ flex: 1 }}>{t.willErase(describeRuns(t, runs, g.unit))}</span>
               <span style={{ color: "var(--text2)" }}>{f.size(erasedBytes)}</span>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

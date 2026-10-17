@@ -1,6 +1,6 @@
 import type { FlashGeometry } from "../backend/types";
 import { fmtDate, fmtHex, fmtHex32 } from "../domain/format";
-import { bankBase, bankCount } from "../domain/geometry";
+import { bankBase, bankCount, bankSize } from "../domain/geometry";
 import type { ReadRange } from "./machine";
 
 /**
@@ -17,9 +17,9 @@ export function rangeFields(range: ReadRange, g: FlashGeometry): { startText: st
     case "all":
       return locked(g.base, g.size);
     case "b1":
-      return locked(g.base, g.bankSize);
+      return locked(g.base, bankSize(g, 0));
     case "b2":
-      return locked(bankBase(g, 1), g.bankSize);
+      return locked(bankBase(g, 1), bankSize(g, 1));
     case "custom":
       return { startText: fmtHex32(g.base), sizeText: "0x40000" };
   }

@@ -23,7 +23,15 @@ export const NUMBERS = {
 /** The language's own name, shown in the language picker in every language. */
 export const LANGUAGE_NAME = "Русский";
 
-const sectors = (n: number) => `${n} ${plural(n, ["сектор", "сектора", "секторов"])}`;
+import type { EraseUnit } from "../backend/types";
+
+const FORMS = {
+  sector: ["сектор", "сектора", "секторов"],
+  page: ["страница", "страницы", "страниц"],
+} as const;
+/** `3 сектора`, `5 страниц`. */
+const units = (n: number, unit: EraseUnit) => `${n} ${plural(n, FORMS[unit])}`;
+const Unit = (unit: EraseUnit) => (unit === "page" ? "Страница" : "Сектор");
 
 export const ru = {
   lang: "ru" as "ru" | "en",
@@ -73,8 +81,11 @@ export const ru = {
   swd: "Частота SWD",
   mcu: "Микроконтроллер",
   core: "Ядро",
-  flashVal: (size: string, banks: number, perBank: number) =>
-    banks > 1 ? `${size} · ${banks} банка по ${perBank} секторов` : `${size} · ${sectors(perBank)}`,
+  /** `perBank` is `null` when the banks differ. */
+  flashVal: (size: string, banks: number, perBank: number | null, total: number, unit: EraseUnit) =>
+    banks > 1 && perBank !== null
+      ? `${size} · ${banks} банка по ${units(perBank, unit)}`
+      : `${size} · ${units(total, unit)}`,
   rdp: "Защита чтения",
   rdpVal: { Level0: "RDP 0 · нет", Level1: "RDP 1 · чтение запрещено", Level2: "RDP 2 · отладка отключена" },
   other: "Другие действия",
@@ -119,7 +130,10 @@ export const ru = {
   bank1: "Банк 1",
   bank2: "Банк 2",
   bankN: (n: number) => `Банк ${n}`,
-  sectorTitle: (bank: number, index: number, addr: string) => `Банк ${bank}, сектор ${index} · ${addr}`,
+  mapTitle: (bank: number, first: number, last: number, addr: string, unit: EraseUnit) =>
+    first === last
+      ? `Банк ${bank}, ${Unit(unit).toLowerCase()} ${first} · ${addr}`
+      : `Банк ${bank}, ${unit === "page" ? "страницы" : "сектора"} ${first}–${last} · ${addr}`,
   willErase: (what: string) => `Будут стёрты: ${what}`,
   fw: "Прошивка",
   unchanged: "Не изменится",
@@ -131,8 +145,8 @@ export const ru = {
   eraseWrite: "Стереть и записать",
 
   // sectors: `сектора 0–1, банк 1`, `сектор 7 банка 1 и 0 банка 2`
-  runs: (runs: { span: string; bank: number; many: boolean }[], many: boolean, long: boolean) => {
-    const word = many ? "сектора" : "сектор";
+  runs: (runs: { span: string; bank: number; many: boolean }[], many: boolean, long: boolean, unit: EraseUnit) => {
+    const word = unit === "page" ? (many ? "страницы" : "страница") : many ? "сектора" : "сектор";
     if (runs.length === 1 && !long) return `${word} ${runs[0].span}, банк ${runs[0].bank}`;
     return `${word} ${runs.map((r) => `${r.span} банка ${r.bank}`).join(" и ")}`;
   },
@@ -141,10 +155,12 @@ export const ru = {
   addrEnter: "Введите адрес: 0x08000000 или десятичное число",
   addrFlashStart: (bank: number) => `Начало flash, банк ${bank}`,
   addrBankStart: (bank: number) => `Начало банка ${bank}`,
-  addrSector: (index: number, bank: number) => `Сектор ${index}, банк ${bank}`,
-  addrAligned: (where: string) => `${where} · выровнено по сектору`,
-  addrUnaligned: (where: string, sector: string) =>
-    `${where} · не с начала сектора: сектор с ${sector} будет стёрт целиком`,
+  addrUnit: (index: number, bank: number, unit: EraseUnit) => `${Unit(unit)} ${index}, банк ${bank}`,
+  addrAligned: (where: string, unit: EraseUnit) => `${where} · выровнено по ${unit === "page" ? "странице" : "сектору"}`,
+  addrUnaligned: (where: string, at: string, unit: EraseUnit) =>
+    unit === "page"
+      ? `${where} · не с начала страницы: страница с ${at} будет стёрта целиком`
+      : `${where} · не с начала сектора: сектор с ${at} будет стёрт целиком`,
   planEmpty: "Файл пустой — записывать нечего",
   planGeometry: "Неизвестная раскладка flash",
   planOutside: (range: string) => `Адрес вне flash (${range})`,
@@ -158,8 +174,10 @@ export const ru = {
   readUnknown: "Размер flash неизвестен — чтение недоступно",
 
   // confirm
-  cfTitle: (n: number) => `Стереть ${sectors(n)} и записать прошивку?`,
-  cf2: (n: number) => `${n === 1 ? "будет стёрт" : "будут стёрты"}. Остальная память не изменится.`,
+  cfTitle: (n: number, unit: EraseUnit) =>
+    `Стереть ${units(n, unit).replace(/страница$/, "страницу")} и записать прошивку?`,
+  cf2: (n: number, unit: EraseUnit) =>
+    `${n === 1 ? (unit === "page" ? "будет стёрта" : "будет стёрт") : "будут стёрты"}. Остальная память не изменится.`,
 
   // progress
   writing: (name: string) => `Запись ${name}`,
@@ -172,8 +190,8 @@ export const ru = {
   stWaiting: "ожидание",
   stOff: "выключено",
   stMatch: "совпадает",
-  sectorOf: (i: number, n: number) => `сектор ${i} из ${n}`,
-  sectorsN: sectors,
+  unitOf: (i: number, n: number, unit: EraseUnit) => `${Unit(unit).toLowerCase()} ${i} из ${n}`,
+  unitsN: units,
   kbOf: (pct: number, done: number, total: number, rate: string) => `${pct} % · ${done} из ${total} КБ · ${rate}`,
   left: (s: string) => `осталось ${s}`,
   progressLabel: "Общий прогресс",
@@ -185,7 +203,7 @@ export const ru = {
     `${name} · ${size} за ${time} · ${restarted ? "МК перезагружен" : "ядро остановлено"}`,
   region: "Область",
   erased: "Стёрто",
-  erasedVal: (n: number, size: string) => `${sectors(n)} · ${size}`,
+  erasedVal: (n: number, size: string, unit: EraseUnit) => `${units(n, unit)} · ${size}`,
   toDevice: "К устройству",
   again: "Записать снова",
 

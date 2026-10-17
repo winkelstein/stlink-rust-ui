@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { H743_GEOMETRY as g, planWrite, readableFlash, sameSectors, sectorRuns } from "./geometry";
+import {
+  H743_GEOMETRY,
+  H743_GEOMETRY as g,
+  allSectors,
+  bankBase,
+  makeGeometry,
+  mapBlocks,
+  planWrite,
+  readableFlash,
+  runs,
+  sameSectors,
+  sectorOf,
+  sectorRuns,
+} from "./geometry";
 import { crc32 } from "./crc32";
 import { parseNumber, writeAddrHint, checkReadRange, readCheckText } from "./validate";
-import { estimateWrite, remainingSeconds, writeFraction } from "./estimate";
+import { estimateWrite, remainingSeconds, speedFor, writeFraction } from "./estimate";
 import { fmtAgo, fmtFreq, fmtHex32, fmtInt, fmtRange, fmtSize, fmtUid, fmtVoltage, plural } from "./format";
 import { DEFAULT_QUICK, migrateQuick, needsConfirm, onFileChanged } from "./quickWrite";
 import { normalizeSettings, DEFAULT_SETTINGS, type BinFile, type FlashPlan } from "../backend/types";
@@ -23,13 +36,13 @@ describe("planWrite (port of geometry.rs)", () => {
   it("small image, one sector", () => {
     const p = plan(0x0800_0000, 16892);
     expect(p.paddedLen).toBe(16896);
-    expect(p.sectors).toEqual([{ bank: 0, index: 0, addr: 0x0800_0000 }]);
+    expect(p.sectors).toEqual([{ bank: 0, index: 0, addr: 0x0800_0000, size: 128 * 1024 }]);
   });
 
   it("spans banks", () => {
     expect(plan(0x080e_0000, 256 * 1024).sectors).toEqual([
-      { bank: 0, index: 7, addr: 0x080e_0000 },
-      { bank: 1, index: 0, addr: 0x0810_0000 },
+      { bank: 0, index: 7, addr: 0x080e_0000, size: 128 * 1024 },
+      { bank: 1, index: 0, addr: 0x0810_0000, size: 128 * 1024 },
     ]);
   });
 
@@ -49,13 +62,13 @@ describe("planWrite (port of geometry.rs)", () => {
   it("mockup file: 183 KB at flash start erases sectors 0–1", () => {
     const p = plan(0x0800_0000, 187_392);
     expect(p.sectors.map((s) => s.index)).toEqual([0, 1]);
-    expect(sectorRuns(g, p.sectors)).toEqual([
+    expect(sectorRuns(p.sectors)).toEqual([
       { bank: 0, first: 0, last: 1, addr: 0x0800_0000, end: 0x0804_0000 },
     ]);
   });
 
   it("sector runs split by bank", () => {
-    const runs = sectorRuns(g, plan(0x080e_0000, 256 * 1024).sectors);
+    const runs = sectorRuns(plan(0x080e_0000, 256 * 1024).sectors);
     expect(runs.map((r) => [r.bank, r.first, r.last])).toEqual([
       [0, 7, 7],
       [1, 0, 0],
@@ -67,6 +80,64 @@ describe("planWrite (port of geometry.rs)", () => {
     expect(sameSectors(a, plan(0x0800_0100, 64).sectors)).toBe(true);
     expect(sameSectors(a, plan(0x0802_0000, 64).sectors)).toBe(false);
     expect(sameSectors(null, a)).toBe(false);
+  });
+});
+
+describe("non-uniform geometry (F4 / F7 / G4 / F1)", () => {
+  const f427 = makeGeometry(0x0800_0000, [runs("4x16 1x64 7x128"), runs("4x16 1x64 7x128")], "sector", 4);
+  const g474 = makeGeometry(0x0800_0000, [runs("128x2"), runs("128x2")], "page", 8);
+  const f103 = makeGeometry(0x0800_0000, [runs("64x1")], "page", 2);
+
+  it("sectors of different sizes, bank 2 after bank 1", () => {
+    expect(f427.size).toBe(2048 * 1024);
+    expect(allSectors(f427)).toHaveLength(24);
+    expect(bankBase(f427, 1)).toBe(0x0810_0000);
+    expect(sectorOf(f427, 0x0801_0000)).toEqual({ bank: 0, index: 4, addr: 0x0801_0000, size: 64 * 1024 });
+    const r = planWrite(f427, 0x0800_0000, 70 * 1024);
+    expect(r.ok && r.plan.sectors.map((s) => s.size / 1024)).toEqual([16, 16, 16, 16, 64]);
+  });
+
+  it("same as geometry.rs across the bank boundary", () => {
+    const r = planWrite(f427, 0x080e_0000, 256 * 1024);
+    expect(r.ok && r.plan.sectors.map((s) => [s.bank, s.index])).toEqual([
+      [0, 11],
+      [1, 0],
+      [1, 1],
+      [1, 2],
+      [1, 3],
+      [1, 4],
+    ]);
+  });
+
+  it("the map groups hundreds of pages", () => {
+    const blocks = mapBlocks(g474);
+    expect(blocks).toHaveLength(64); // 2 banks × 32 blocks of 4 pages
+    expect(blocks[0]).toEqual({ bank: 0, addr: 0x0800_0000, size: 8 * 1024, first: 0, last: 3 });
+    expect(mapBlocks(H743_GEOMETRY)).toHaveLength(16); // few sectors: one each
+    expect(mapBlocks(f103)).toHaveLength(32);
+  });
+
+  it("sameSectors compares addresses and sizes", () => {
+    const a = [{ bank: 0, index: 0, addr: 0x0800_0000, size: 1024 }];
+    expect(sameSectors(a, [{ bank: 0, index: 0, addr: 0x0800_0000, size: 2048 }])).toBe(false);
+    expect(sameSectors(a, [...a])).toBe(true);
+  });
+
+  it("address hints say page or sector", () => {
+    expect(writeAddrHint(ru, f103, "0x08000400", 10).text).toBe("Страница 1, банк 1 · выровнено по странице");
+    expect(writeAddrHint(ru, f103, "0x08000402", 10).text).toBe(
+      "Страница 1, банк 1 · не с начала страницы: страница с 0x08000400 будет стёрта целиком",
+    );
+    expect(writeAddrHint(en, g474, "0x08040000", 10).text).toBe("Start of bank 2 · page-aligned");
+  });
+
+  it("per-family estimates", () => {
+    const h7 = speedFor("H7");
+    expect(speedFor(undefined)).toBe(h7);
+    expect(speedFor("F2_F4").eraseUnit(128 * 1024)).toBeGreaterThan(speedFor("F2_F4").eraseUnit(16 * 1024));
+    const r = planWrite(g474, 0x0800_0000, 4096);
+    const e = r.ok ? estimateWrite(r.plan, true, speedFor("G4")) : null;
+    expect(e?.erasing).toBeCloseTo(0.12);
   });
 });
 
@@ -271,8 +342,12 @@ describe("i18n", () => {
   });
 
   it("plural strings", () => {
-    expect(dict("ru").cfTitle(2)).toBe("Стереть 2 сектора и записать прошивку?");
-    expect(dict("en").cfTitle(1)).toBe("Erase 1 sector and flash the firmware?");
+    expect(dict("ru").cfTitle(2, "sector")).toBe("Стереть 2 сектора и записать прошивку?");
+    expect(dict("ru").cfTitle(1, "page")).toBe("Стереть 1 страницу и записать прошивку?");
+    expect(dict("ru").cfTitle(5, "page")).toBe("Стереть 5 страниц и записать прошивку?");
+    expect(dict("ru").cf2(1, "page")).toMatch(/^будет стёрта/);
+    expect(dict("en").cfTitle(1, "sector")).toBe("Erase 1 sector and flash the firmware?");
+    expect(dict("en").cfTitle(3, "page")).toBe("Erase 3 pages and flash the firmware?");
     expect(dict("ru").entries(21)).toBe("21 запись");
     expect(dict("ru").banksVal(2)).toBe("1 и 2");
   });

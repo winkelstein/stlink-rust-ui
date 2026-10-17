@@ -18,7 +18,7 @@ export const NUMBERS: typeof RU_NUMBERS = {
   hAgo: (n) => `${n} h ago`,
 };
 
-const sectors = (n: number) => `${n} ${n === 1 ? "sector" : "sectors"}`;
+const units = (n: number, unit: "page" | "sector") => `${n} ${unit}${n === 1 ? "" : "s"}`;
 
 export const en: Dict = {
   lang: "en",
@@ -63,8 +63,8 @@ export const en: Dict = {
   swd: "SWD clock",
   mcu: "Microcontroller",
   core: "Core",
-  flashVal: (size, banks, perBank) =>
-    banks > 1 ? `${size} · ${banks} banks × ${perBank} sectors` : `${size} · ${sectors(perBank)}`,
+  flashVal: (size, banks, perBank, total, unit) =>
+    banks > 1 && perBank !== null ? `${size} · ${banks} banks × ${units(perBank, unit)}` : `${size} · ${units(total, unit)}`,
   rdp: "Read protection",
   rdpVal: { Level0: "RDP 0 · none", Level1: "RDP 1 · read protected", Level2: "RDP 2 · debug disabled" },
   other: "Other actions",
@@ -106,7 +106,8 @@ export const en: Dict = {
   bank1: "Bank 1",
   bank2: "Bank 2",
   bankN: (n) => `Bank ${n}`,
-  sectorTitle: (bank, index, addr) => `Bank ${bank}, sector ${index} · ${addr}`,
+  mapTitle: (bank, first, last, addr, unit) =>
+    first === last ? `Bank ${bank}, ${unit} ${first} · ${addr}` : `Bank ${bank}, ${unit}s ${first}–${last} · ${addr}`,
   willErase: (what) => `Will be erased: ${what}`,
   fw: "Firmware",
   unchanged: "Unchanged",
@@ -117,8 +118,8 @@ export const en: Dict = {
   back: "Back",
   eraseWrite: "Erase and flash",
 
-  runs: (runs, many, long) => {
-    const word = many ? "sectors" : "sector";
+  runs: (runs, many, long, unit) => {
+    const word = many ? `${unit}s` : unit;
     if (runs.length === 1 && !long) return `${word} ${runs[0].span}, bank ${runs[0].bank}`;
     return `${word} ${runs.map((r) => `${r.span} of bank ${r.bank}`).join(" and ")}`;
   },
@@ -126,9 +127,9 @@ export const en: Dict = {
   addrEnter: "Enter an address: 0x08000000 or a decimal number",
   addrFlashStart: (bank) => `Start of flash, bank ${bank}`,
   addrBankStart: (bank) => `Start of bank ${bank}`,
-  addrSector: (index, bank) => `Sector ${index}, bank ${bank}`,
-  addrAligned: (where) => `${where} · sector-aligned`,
-  addrUnaligned: (where, sector) => `${where} · not at a sector start: the sector at ${sector} is erased entirely`,
+  addrUnit: (index, bank, unit) => `${unit === "page" ? "Page" : "Sector"} ${index}, bank ${bank}`,
+  addrAligned: (where, unit) => `${where} · ${unit}-aligned`,
+  addrUnaligned: (where, at, unit) => `${where} · not at a ${unit} start: the ${unit} at ${at} is erased entirely`,
   planEmpty: "The file is empty — nothing to write",
   planGeometry: "Unknown flash layout",
   planOutside: (range) => `Address outside flash (${range})`,
@@ -141,7 +142,7 @@ export const en: Dict = {
   readToEnd: "to the end of flash",
   readUnknown: "Flash size is unknown — reading is not available",
 
-  cfTitle: (n) => `Erase ${sectors(n)} and flash the firmware?`,
+  cfTitle: (n, unit) => `Erase ${units(n, unit)} and flash the firmware?`,
   cf2: () => "will be erased. The rest of the memory stays unchanged.",
 
   writing: (name) => `Flashing ${name}`,
@@ -154,8 +155,8 @@ export const en: Dict = {
   stWaiting: "waiting",
   stOff: "off",
   stMatch: "match",
-  sectorOf: (i, n) => `sector ${i} of ${n}`,
-  sectorsN: sectors,
+  unitOf: (i, n, unit) => `${unit} ${i} of ${n}`,
+  unitsN: units,
   kbOf: (pct, done, total, rate) => `${pct} % · ${done} of ${total} KB · ${rate}`,
   left: (s) => `${s} left`,
   progressLabel: "Overall progress",
@@ -165,7 +166,7 @@ export const en: Dict = {
   doneSub: (name, size, time, restarted) => `${name} · ${size} in ${time} · ${restarted ? "MCU restarted" : "core halted"}`,
   region: "Range",
   erased: "Erased",
-  erasedVal: (n, size) => `${sectors(n)} · ${size}`,
+  erasedVal: (n, size, unit) => `${units(n, unit)} · ${size}`,
   toDevice: "Back to device",
   again: "Flash again",
 

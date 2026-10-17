@@ -7,10 +7,16 @@ import { ChipIcon, EraseIcon, ProbeIcon, ReadIcon, RebootIcon, ReleaseIcon, Writ
 import { KeyValue } from "../components/KeyValue";
 import { chipFullName, coreName, probeModelName } from "../domain/chipNames";
 import { fmtHex16, fmtHex32, fmtRange, fmtUid } from "../domain/format";
-import { bankCount, sectorsPerBank } from "../domain/geometry";
+import { allSectors, bankCount, unitsInBank } from "../domain/geometry";
 import { useT } from "../i18n";
+import type { FlashGeometry } from "../backend/types";
 import { isBusy } from "../state/machine";
 import { BannerSlot, contentStyle, screenStyle, useApp, useNow } from "./shared";
+
+/** All banks have the same layout (for «2 banks × 8 sectors»). */
+function sameBanks(g: FlashGeometry): boolean {
+  return g.banks.every((b) => JSON.stringify(b.runs) === JSON.stringify(g.banks[0].runs));
+}
 
 const RDP_COLOR = { Level0: "var(--ok)", Level1: "var(--warn)", Level2: "var(--warn)" } as const;
 
@@ -279,7 +285,11 @@ function TargetCard() {
   }
   const g = tg.geometry;
   const flash =
-    tg.flashSize === null ? "—" : g ? t.flashVal(f.size(tg.flashSize), bankCount(g), sectorsPerBank(g)) : f.size(tg.flashSize);
+    tg.flashSize === null
+      ? "—"
+      : g
+        ? t.flashVal(f.size(tg.flashSize), bankCount(g), sameBanks(g) ? unitsInBank(g, 0) : null, allSectors(g).length, g.unit)
+        : f.size(tg.flashSize);
   return (
     <section className="card" style={{ padding: "12px 18px" }}>
       <CardHead icon={<ChipIcon />} accent eyebrow={t.mcu} title={chipFullName(tg, t)} />

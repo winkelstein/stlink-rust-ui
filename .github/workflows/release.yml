@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version matches the tag
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+      - run: node scripts/check-version.mjs "${{ github.ref_name }}"
+
+  build:
+    name: ${{ matrix.name }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            targets: aarch64-apple-darwin x86_64-apple-darwin
+            args: --target universal-apple-darwin
+          - name: Windows
+            os: windows-latest
+            targets: ""
+            args: ""
+          - name: Linux
+            os: ubuntu-22.04
+            targets: ""
+            args: --bundles appimage,deb
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Linux packages (Tauri 2, nusb)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libudev-dev libxdo-dev libssl-dev build-essential file
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          for t in ${{ matrix.targets }}; do rustup target add "$t"; done
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          key: release-${{ matrix.name }}
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Optional signing: each block runs only when its secrets are set (see
+      # docs/release.md). Without them macOS gets the ad-hoc signature from
+      # tauri.macos.conf.json and Windows installers are unsigned.
+      - name: Apple signing and notarization (if configured)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            {
+              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            } >> "$GITHUB_ENV"
+            echo "Signing with $APPLE_SIGNING_IDENTITY"
+            if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              {
+                echo "APPLE_ID=$APPLE_ID"
+                echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+                echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+              } >> "$GITHUB_ENV"
+              echo "Notarization on"
+            fi
+          else
+            echo "No Apple certificate: ad-hoc signature"
+          fi
+
+      - name: Windows code signing (if configured)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) { Write-Output "No Windows certificate: unsigned installers"; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfx
+          $config = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } } | ConvertTo-Json -Compress -Depth 5
+          Set-Content -Path (Join-Path $env:RUNNER_TEMP "sign.json") -Value $config
+          "TAURI_SIGN_ARGS=--config $(Join-Path $env:RUNNER_TEMP 'sign.json')" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Output "Signing with $($cert.Subject)"
+
+      - uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: stlink-rust-ui ${{ github.ref_name }}
+          releaseBody: Installers for macOS (universal), Windows and Linux. See docs/windows.md for the Windows driver.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }} ${{ env.TAURI_SIGN_ARGS }}

@@ -7,7 +7,8 @@ Full requirements: @docs/PRD-stlink-rust-ui-2026-10-17.md
 ## Current stage
 - Stage 1 (library `stlink/` + test bench `stlink-cli/`): M0–M3 for H7 are done and verified on the bench; full erase is available (`flash::mass_erase`, H7 bank erase ~5.5 s per 1 MB bank).
 - Stage 2 (GUI, Tauri 2 + React 19 + TS in `src-tauri/`, `src/`): screens and sheets per `docs/design/`, explicit connect/disconnect, write/read/full erase, quick flash, settings, log, ru/en. See "Stage 2 notes".
-- Deferred: M3 for other families (F4/F427, then F1, L4, G4, G0, F0, F7), M4 DFU (no hardware yet).
+- M3b (more families): flash drivers for F0/F1/F3 (+ F1 XL), F2/F4, F7, G4 — tested against the register model `flash/fake.rs` only, not on hardware yet (checklist: `docs/hardware-checklist.md`; F427 bench planned). Layouts in `stlink/chips/layouts.txt`.
+- Deferred: L4, G0, L0/L1 and other families, M4 DFU (no hardware yet).
 - Flash write mode is settled (PRD open question 1): direct register writes over SWD in 1 KB chunks, no flash loader. H743: programming ~87 KB/s @1.8 MHz, ~137 KB/s @4 MHz; erase ~0.95 s per 128 KB sector.
 
 ## Test bench
@@ -40,7 +41,7 @@ Full requirements: @docs/PRD-stlink-rust-ui-2026-10-17.md
 | `chips` | chip table from `chips/stlink/*.chip` (stlink, BSD-3) + `chips/extras.txt`; RDP/DBGMCU tables per `flash_type` |
 | `target` | `identify()` → `TargetInfo`; chip lookup via the debug AP (H7: AP2); `enable_debug_in_low_power` |
 | `session` | `ConnectOptions` → `StLink::connect` → `Connection`; `release` |
-| `flash` | `dump` (flash only, `Error::OutOfFlash`), `read_len`, `plan_write`, `geometry`, `write_flash` (erase → program → verify), `mass_erase` (per bank), `read_protection`; drivers via the `FlashDriver` trait (`flash/h7.rs`), geometry/plan in `flash/geometry.rs` |
+| `flash` | `dump` (flash only, `Error::OutOfFlash`), `read_len`, `plan_write`, `geometry`, `write_flash` (erase → program → verify), `mass_erase` (per bank), `read_protection`; drivers via the `FlashDriver` trait over the `mem::Memory` trait (`h7.rs`, `f0f1.rs`, `f4.rs` for F2/F4/F7, `g4.rs`), sequences in `ops.rs`, geometry (banks of page/sector runs) in `geometry.rs`, layouts from `chips/layouts.txt` via `layout.rs`; `fake.rs` + `driver_tests.rs` = register model and per-family tests |
 
 ## Stage 2 notes (UI)
 - **Design:** `docs/design/README.md` (screens, quick-flash rules) and `docs/design/Main.dc.html` (markup, light/dark CSS tokens, copy for every screen). Port to React + TS keeping the structure and tokens.

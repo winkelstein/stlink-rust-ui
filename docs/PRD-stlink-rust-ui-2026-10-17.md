@@ -279,7 +279,7 @@ stlink-rust-ui/
 | **M1** | Discovery + probe + registers | F1, F2 (basic commands), F3 (memory, halt, registers), F4 (chip table) | `stlink-cli probe` on H743 matches `st-info --probe`; `stlink-cli regs` prints core registers | Done |
 | M2 | Flash read | F5, progress, SWD clock | The dump matches `st-flash read` | Done |
 | M3 | Flash write (ST-Link), H7 | F6 for H7, full erase | Write + verify on H743 | Done |
-| **M3b** | More families | F6 for F0, F1, F4, G4, F7 | Write + verify + erase all on each family (see the per-family checklist) | Next |
+| **M3b** | More families | F6 for F0, F1, F4, G4, F7 (plus F2, F3 on the same controllers) | Write + verify + erase all on each family (`docs/hardware-checklist.md`) | Drivers done and tested against a register model; hardware verification pending (F427 first) |
 | M4 | DFU | F7 on F427 | Write + verify via DfuSe | Waiting for hardware |
 | M5 | GUI | F8: Tauri commands and events, React screens | The full read/write flow from the GUI | Done |
 | M6 | Platforms and formats | Windows (done), CI/CD (done), `.hex`, Linux polish | See §11 | In progress |

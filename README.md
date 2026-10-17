@@ -18,7 +18,7 @@
 ## Features
 
 - **Identify** the probe and the target, like `st-info --probe`: firmware version, serial, target voltage, chip, core, flash and SRAM size, UID, read protection.
-- **Flash** a `.bin` with a preview of exactly which sectors will be erased, then program and verify.
+- **Flash** a `.bin` with a preview of exactly which pages or sectors will be erased, then program and verify.
 - **Read** the whole flash, one bank or a range into a `.bin`.
 - **Erase all** (mass erase), behind an explicit confirmation.
 - **Quick flash**: the last file and address are remembered per chip; ⌘R / Ctrl+R re-flashes it, and the app can re-flash automatically whenever your build overwrites the file.
@@ -31,13 +31,16 @@
 
 **Probes:** ST-Link V2 (including clones, `0483:3748`), V2-1 and V3, over SWD.
 
-| Family | Identify | Read | Flash / erase |
-|---|---|---|---|
-| STM32H72x/H73x, H74x/H75x | ✅ | ✅ | ✅ |
-| STM32F0, F1, F4, F7, G4 | ✅ | ✅ | In progress |
-| Other STM32 (from the stlink chip table) | ✅ | ✅ | Not yet |
+| Family | Identify | Read | Flash / erase | Verified |
+|---|---|---|---|---|
+| STM32H72x/H73x, H74x/H75x | ✅ | ✅ | ✅ | on hardware (STM32H743) |
+| STM32F0, F1 (incl. XL-density), F3 | ✅ | ✅ | ✅ | tests only |
+| STM32F2, F4 (incl. F42x/F43x dual bank) | ✅ | ✅ | ✅ | tests only (F427 planned) |
+| STM32F7 | ✅ | ✅ | ✅ | tests only |
+| STM32G4 | ✅ | ✅ | ✅ | tests only |
+| Other STM32 (from the stlink chip table) | ✅ | ✅ | Not yet | |
 
-Only the STM32H743 is tested on hardware so far; the other families are identified and read from the chip table. USB DFU (flashing through the STM32 system bootloader without a probe) is planned.
+"Tests only" means the flash driver is tested against a register model of the controller (`stlink/src/flash/fake.rs`), not yet on a real board; the steps to verify a family are in [docs/hardware-checklist.md](docs/hardware-checklist.md). F0/F1/F3 need ST-Link firmware with 16-bit memory access (V2 J26 or later). USB DFU (flashing through the STM32 system bootloader without a probe) is planned.
 
 ## Install
 

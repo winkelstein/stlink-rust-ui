@@ -81,7 +81,9 @@ The frontend (`src/`) follows the prototype in React 19 + TypeScript without UI 
 
 **Connecting.** Hot-plug comes from `nusb::watch_devices`; a detected probe is not opened. "Connect" → `connect` (open → voltage → connect → identify → RDP, geometry) with the probe options from Settings; "Disconnect" → `disconnect` (drop `StLink`). The CoreNotAccessible banner offers to connect again under reset or with debug kept in low-power (one-off, settings are not changed).
 
-**Erase all.** `flash::mass_erase`: bank erase per bank (H7: BER + START), progress per bank, cancellation between banks. Within a bank the bar fills by the time estimate (or by the previous bank's time). After erasing, the core is halted.
+**Flash families.** The geometry is banks of page or sector runs of any size (`FlashGeometry.banks`, `unit: "page" | "sector"`), the same as in the library. The flash map draws blocks proportional to their bytes and groups hundreds of pages into at most 32 blocks per bank. Every text that names the erase unit (address hint, map legend, confirmation, progress, done screen, device card) says pages or sectors, in both languages. Time estimates are per flash family (`speedFor` in `src/domain/estimate.ts`; H7 measured, the others `TODO(measure)`). The mock has benches for H743, F103C8, F411CE, F427, G474 and F746 (dev panel → Board).
+
+**Erase all.** `flash::mass_erase`: bank erase per bank (H7: BER + START; F2/F4/F7: MER/MER1; G4: MER1/MER2; F0/F1: MER per register set), progress per bank, cancellation between banks. Within a bank the bar fills by the time estimate (or by the previous bank's time). After erasing, the core is halted.
 
 **Log.** `src-tauri` has its own `tracing` layer: a ring buffer of 5000 lines, new lines batched into the `log://entry` event at most every 100 ms; the same filter writes the file `~/Library/Logs/com.andrewwinkelstein.stlink-rust-ui/stlink-ui.log`. `stlink` TRACE (USB packets) is toggled on the fly by "Verbose USB log" (`reload::Handle`), `nusb` is silenced. Command errors go to the log with their `message`; the UI shows text by `kind` from the dictionary, with `message` under "Details".
 

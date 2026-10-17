@@ -1,7 +1,7 @@
 //! Flash operations: reading (dump), protection check, erase/program/verify,
 //! mass erase. Families: F0/F1/F3 (pages), F2/F4/F7 (sectors), G4 (pages),
 //! H74x/H75x/H72x/H73x (sectors). Drivers talk to the target through the
-//! [`mem::Memory`] trait, so the sequences are tested against a register
+//! `Memory` trait (crate-internal), so the sequences are tested against a register
 //! model (`fake`) without hardware.
 
 mod ctrl;

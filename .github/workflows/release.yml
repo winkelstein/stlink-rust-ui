@@ -206,7 +206,8 @@ jobs:
           }
           $file = Join-Path $env:RUNNER_TEMP "tauri.release.json"
           @{ bundle = @{ windows = $windows } } | ConvertTo-Json -Depth 6 | Set-Content -Path $file
-          "TAURI_EXTRA_ARGS=--config $file" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Forward slashes: the build step runs in bash, which would eat backslashes.
+          "TAURI_EXTRA_ARGS=--config $($file -replace '\\', '/')" | Out-File -FilePath $env:GITHUB_ENV -Append
           Get-Content $file
 
       - name: Build the app

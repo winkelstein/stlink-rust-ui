@@ -10,15 +10,11 @@ use tracing::{debug, info, warn};
 use crate::usb::ProbeDescriptor;
 use crate::usb::transport::Transport;
 use crate::{Error, Result};
-use protocol::{DEBUG_COMMAND, debug as dbg, le_u32};
+pub(crate) use protocol::le_u32;
+use protocol::{DEBUG_COMMAND, debug as dbg};
 
 pub use protocol::{ProbeMode, status_name};
 pub use version::{ApiVersion, ProbeCapabilities, ProbeVersion};
-
-/// Little-endian u32 at `offset` of a probe response.
-pub(crate) fn le_u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    le_u32(data, offset)
-}
 
 /// Default timeout of a single USB transfer.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_millis(1000);
@@ -210,7 +206,10 @@ impl StLink {
         le_u32(&r, 4)
     }
 
-    /// Read one 32-bit word (address must be 4-aligned).
+    /// Read one 32-bit word with `READ_DEBUG_REG` (address must be 4-aligned).
+    ///
+    /// Prefer [`StLink::read_u32`]: V2 firmware (seen on J46) reports OK with
+    /// stale data here when the AP access fails.
     pub fn read_debug32(&mut self, addr: u32) -> Result<u32> {
         check_align(addr, 4)?;
         let mut cmd = [DEBUG_COMMAND, dbg::APIV2_READ_DEBUG_REG, 0, 0, 0, 0];
@@ -220,7 +219,8 @@ impl StLink {
         le_u32(&r, 4)
     }
 
-    /// Write one 32-bit word (address must be 4-aligned).
+    /// Write one 32-bit word with `WRITE_DEBUG_REG` (address must be 4-aligned).
+    /// Prefer [`StLink::write_u32`], which reports AP failures.
     pub fn write_debug32(&mut self, addr: u32, value: u32) -> Result<()> {
         check_align(addr, 4)?;
         let mut cmd = [0u8; 10];

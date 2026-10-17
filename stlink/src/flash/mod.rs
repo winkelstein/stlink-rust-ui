@@ -9,6 +9,7 @@ use tracing::{debug, info, warn};
 
 use crate::chips::ChipDescriptor;
 use crate::probe::StLink;
+use crate::target::TargetInfo;
 use crate::{Error, Result};
 
 pub use geometry::{FlashGeometry, Sector, WritePlan};
@@ -38,9 +39,40 @@ fn driver_for(chip: &ChipDescriptor, flash_size: u32) -> Result<Box<dyn FlashDri
     }
 }
 
-/// Flash layout used for writing to `chip`, if writing is supported.
-pub fn write_geometry(chip: &ChipDescriptor, flash_size: u32) -> Result<FlashGeometry> {
-    Ok(driver_for(chip, flash_size)?.geometry())
+fn target_driver(target: &TargetInfo) -> Result<Box<dyn FlashDriver>> {
+    let chip = target
+        .chip
+        .ok_or(Error::Unsupported("flash programming for an unknown chip"))?;
+    let flash_size = target.flash_size.ok_or(Error::Unsupported(
+        "flash programming without a known flash size",
+    ))?;
+    driver_for(chip, flash_size)
+}
+
+/// Validate a write and list the sectors it will erase, without touching the
+/// target (e.g. for a confirmation dialog).
+pub fn plan_write(target: &TargetInfo, addr: u32, len: usize) -> Result<WritePlan> {
+    target_driver(target)?.geometry().plan_write(addr, len)
+}
+
+/// Bytes to read for a dump at `addr`: `size` if given, otherwise up to the
+/// end of flash (only when `addr` is inside flash).
+pub fn read_len(target: &TargetInfo, addr: u32, size: Option<u32>) -> Result<usize> {
+    let len = match (size, target.flash_end()) {
+        (Some(size), _) => u64::from(size),
+        (None, Some(end)) if target.in_flash(addr) => end - u64::from(addr),
+        _ => {
+            return Err(Error::InvalidArgument(
+                "size is required outside the known flash range",
+            ));
+        }
+    };
+    if u64::from(addr) + len > 1 << 32 {
+        return Err(Error::InvalidArgument(
+            "range past the end of address space",
+        ));
+    }
+    usize::try_from(len).map_err(|_| Error::InvalidArgument("size too large"))
 }
 
 /// Bytes read between progress callbacks.
@@ -86,6 +118,24 @@ impl RdpLevel {
 }
 
 impl StLink {
+    /// Dump memory (by default the whole flash, see [`read_len`]). Refuses to
+    /// read RDP-protected flash. Works with the core running.
+    pub fn dump(
+        &mut self,
+        target: &TargetInfo,
+        addr: u32,
+        size: Option<u32>,
+        on_progress: impl FnMut(Progress) -> ControlFlow<()>,
+    ) -> Result<Vec<u8>> {
+        let len = read_len(target, addr, size)?;
+        if let Some(chip) = target.chip
+            && target.in_flash(addr)
+        {
+            self.ensure_unprotected(chip)?;
+        }
+        self.read_flash(addr, len, on_progress)
+    }
+
     /// Read `len` bytes from `addr` in blocks, reporting progress.
     /// Works with the core running (reads go through the AHB-AP).
     pub fn read_flash(
@@ -130,22 +180,17 @@ impl StLink {
     /// on success and on error. Cancelling is possible between blocks.
     pub fn write_flash(
         &mut self,
-        chip: &ChipDescriptor,
-        flash_size: u32,
+        target: &TargetInfo,
         addr: u32,
         data: &[u8],
         verify: bool,
         mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<()> {
-        let mut driver = driver_for(chip, flash_size)?;
+        let mut driver = target_driver(target)?;
         let geometry = driver.geometry();
         let plan = geometry.plan_write(addr, data.len())?;
-        match self.read_protection(chip)? {
-            Some(RdpLevel::Level0) | None => {}
-            Some(level) => {
-                warn!("RDP {level:?}: refusing to write");
-                return Err(Error::FlashProtected);
-            }
+        if let Some(chip) = target.chip {
+            self.ensure_unprotected(chip)?;
         }
         let image = geometry::pad(data, plan.padded_len as usize, geometry.erased_value);
         info!(
@@ -267,6 +312,17 @@ impl StLink {
             }
         }
         Ok(())
+    }
+
+    /// `FlashProtected` unless RDP is level 0 (or unknown for this family).
+    fn ensure_unprotected(&mut self, chip: &ChipDescriptor) -> Result<()> {
+        match self.read_protection(chip)? {
+            Some(RdpLevel::Level0) | None => Ok(()),
+            Some(level) => {
+                warn!("RDP {level:?}: flash not accessible over SWD");
+                Err(Error::FlashProtected)
+            }
+        }
     }
 
     /// Current RDP level; `None` if the register is unknown for this family.

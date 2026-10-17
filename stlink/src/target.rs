@@ -26,6 +26,18 @@ impl TargetInfo {
     pub fn rev_id(&self) -> u16 {
         (self.idcode_raw >> 16) as u16
     }
+
+    /// End of main flash (exclusive), if the flash size is known.
+    pub fn flash_end(&self) -> Option<u64> {
+        self.flash_size
+            .map(|size| u64::from(chips::FLASH_BASE) + u64::from(size))
+    }
+
+    /// Whether `addr` lies in main flash (known size only).
+    pub fn in_flash(&self, addr: u32) -> bool {
+        self.flash_end()
+            .is_some_and(|end| addr >= chips::FLASH_BASE && u64::from(addr) < end)
+    }
 }
 
 impl StLink {

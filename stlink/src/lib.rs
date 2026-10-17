@@ -9,6 +9,7 @@ pub mod chips;
 pub mod error;
 pub mod flash;
 pub mod probe;
+pub mod session;
 pub mod target;
 pub mod usb;
 
@@ -16,5 +17,6 @@ pub use arm::{CoreInfo, CoreRegisters, CoreType};
 pub use chips::ChipDescriptor;
 pub use error::{Error, Result};
 pub use probe::{ProbeCapabilities, ProbeVersion, StLink};
+pub use session::{ConnectOptions, Connection};
 pub use target::TargetInfo;
 pub use usb::{ProbeDescriptor, ProbeModel, list_probes};

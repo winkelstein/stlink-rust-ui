@@ -11,7 +11,7 @@ Desktop-приложение для STM32: чтение/запись проши�
 - Режим записи flash решён (открытый вопрос 1 PRD): прямая запись регистров по SWD пакетами по 1 КБ, flash loader не нужен. H743: программирование ~87 КБ/с @1.8 МГц, ~137 КБ/с @4 МГц; стирание ~0.95 с на сектор 128 КБ.
 
 ## Стенд
-- macOS (Apple Silicon); Windows и Linux — НЕ в v1.
+- Стенд — macOS (Apple Silicon). Windows поддерживается (платформенный код за `cfg(windows)`, проверка — CI и ручной чек-лист `docs/windows.md`, железа под Windows у разработки нет). Linux собирается в CI без отдельной поддержки.
 - Программатор: клон ST-Link V2 `0483:3748`, прошивка V2J46S7 (эталоны: `st-info`, `st-flash`, `openocd`).
 - Таргет: STM32H743VIT6 (Cortex-M7, chip id `0x450`, DBGMCU_IDCODE по `0x5C001000` / через AP2 по `0xE00E1000`, 2 МБ flash, 2 банка, сектора 128 КБ, запись по 32 байта).
 - Особенности стенда (важно для отладки):
@@ -22,7 +22,9 @@ Desktop-приложение для STM32: чтение/запись проши�
 - DFU-таргет позже: STM32F427 (`0483:df11`).
 
 ## Команды
-- Сборка/проверка: `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p stlink`
+- Сборка/проверка: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p stlink`; фронтенд — `npm run build`, `npm test`. То же гоняет CI (`.github/workflows/ci.yml`, macOS / Windows / Ubuntu) и собирает установщики.
+- Windows без Windows: `cargo clippy -p stlink -p stlink-cli --target x86_64-pc-windows-msvc -- -D warnings` (`src-tauri` под Windows — только в CI).
+- Релиз: тег `vX.Y.Z` → `.github/workflows/release.yml` (черновик Release); версия в `Cargo.toml`, `tauri.conf.json`, `package.json` должна совпадать (`node scripts/check-version.mjs vX.Y.Z`). Подробно — `docs/release.md`.
 - Регрессия на железе: `scripts/hw-test.sh [--erase-all] [firmware.bin]` (без аргументов — не пишет flash; с файлом — пишет и сверяет; `--erase-all` — полное стирание и проверка 0xFF, файл затем записывается обратно). Прогонять после изменений в `stlink/`.
 - GUI-бэкенд на железе: `cargo test -p stlink-rust-ui -- --ignored` (connect → disconnect → `st-info --probe` и openocd работают → connect снова).
 - Стенд: `cargo run -p stlink-cli -- list | probe | regs | mem <addr> [count] [--ap N] | read <file> [--addr] [--size] | write <file.bin> [--addr] [--no-verify] [--no-reset] | erase-all`
@@ -38,7 +40,7 @@ Desktop-приложение для STM32: чтение/запись проши�
 | `chips` | таблица чипов из `chips/stlink/*.chip` (stlink, BSD-3) + `chips/extras.txt`; таблицы RDP/DBGMCU по `flash_type` |
 | `target` | `identify()` → `TargetInfo`; поиск чипа через debug-AP (H7: AP2); `enable_debug_in_low_power` |
 | `session` | `ConnectOptions` → `StLink::connect` → `Connection`; `release` |
-| `flash` | `dump`, `read_flash`, `plan_write`, `geometry`, `write_flash` (erase → program → verify), `mass_erase` (по банкам), `read_protection`; драйверы через трейт `FlashDriver` (`flash/h7.rs`), геометрия/план — `flash/geometry.rs` |
+| `flash` | `dump` (только внутри flash, `Error::OutOfFlash`), `read_len`, `plan_write`, `geometry`, `write_flash` (erase → program → verify), `mass_erase` (по банкам), `read_protection`; драйверы через трейт `FlashDriver` (`flash/h7.rs`), геометрия/план — `flash/geometry.rs` |
 
 ## Заметки к Этапу 2 (UI)
 - **Дизайн:** `docs/design/README.md` (экраны, правила быстрой записи) и `docs/design/Main.dc.html` (вёрстка, CSS-токены светлой/тёмной темы, тексты всех экранов). Переносить в React + TS, сохраняя структуру и токены.
@@ -52,6 +54,7 @@ Desktop-приложение для STM32: чтение/запись проши�
 - **Логи для багрепортов:** tracing-subscriber в Tauri с уровнем `trace` для `stlink` в файл/буфер; `nusb` при не-trace уровне выключать (дублирует наши ошибки).
 - **Сборка:** `src-tauri` — член workspace; его `[profile.release]` живёт в корневом `Cargo.toml` (профили членов игнорируются). Запуск: `npm run tauri dev`; `VITE_BACKEND=mock` — фронтенд на `MockBackend`.
 - **Бэкенд GUI (`src-tauri/src`):** `device` (актор на программатор, `Worker`; программатор открывается только командой `connect`, `disconnect` — drop `StLink`), `hotplug` (`nusb::watch_devices` → пересканирование → `device-event` с USB-дескриптором, без открытия), `dto` (зеркало `src/backend/types.ts`), `error` (`{ kind, message }`), `files` (`.bin`, CRC, notify-наблюдатель за каталогом), `settings` (`quick-write.json` в app data, `settings.json` в app config), `logging` (кольцевой буфер 5000 строк + `log://entry`, файл `~/Library/Logs/<id>/stlink-ui.log`; TRACE `stlink` — только с «Подробным журналом USB», через `reload::Handle`). Прогресс — `ipc::Channel`, отмена — `cancel_op(opId)`. Фронтенд: `src/backend/TauriBackend.ts`, строки — `src/i18n/{ru,en}.ts`.
+- **Платформы:** вся платформенная логика фронтенда — `src/platform.ts` (⌘/Ctrl, Finder/проводник); окно — `tauri.macos.conf.json` (overlay titlebar, ad-hoc подпись) и `tauri.windows.conf.json` (нативная рамка). На Windows nusb работает только с WinUSB: другой драйвер → `Error::DriverMissing`, «занято» (ACCESS_DENIED/SHARING_VIOLATION) → `Busy`.
 - **Не готово для GUI:** запись и стирание для семейств кроме H74x/H75x/H72x/H73x (`Error::Unsupported`), DFU.
 
 ## Правила

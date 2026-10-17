@@ -38,3 +38,31 @@
 ## Значения в макетах
 
 Серийник, UID, CRC, имена файлов и время — примеры. Реальные значения брать из `stlink` (`ProbeInfo`, `TargetInfo`, `Progress`).
+
+## Реализация
+
+Фронтенд (`src/`) повторяет прототип на React 19 + TypeScript без UI-китов: токены и общие классы из `Main.dc.html` лежат в `src/styles/tokens.css` без изменений, разметка экранов перенесена с теми же размерами и текстами. Rust пока не подключён: всё работает на `MockBackend`.
+
+| Где | Что |
+|---|---|
+| `src/backend/types.ts` | DTO будущих Tauri-команд, зеркалят типы `stlink` (`ProbeInfo`, `TargetInfo`, `FlashPlan`, `Progress`, `BackendError { kind, message }`) |
+| `src/backend/Backend.ts` | Интерфейс бэкенда: hot-plug, `identify`, `planWrite`, `write`/`read` с прогрессом и `AbortSignal`, `resetAndRun`, выбор и слежение за файлами, настройки быстрой записи по UID |
+| `src/backend/mock/` | `MockBackend`: стенд (ST-Link V2J46S7 + STM32H743, 3,28 В) на таймерах, скорости из CLAUDE.md, настройки в `localStorage` |
+| `src/backend/index.ts` | Выбор реализации. Сейчас всегда mock (`TauriBackend` — TODO) |
+| `src/domain/` | Чистая логика с тестами: порт `plan_write` из `geometry.rs`, валидация адресов, оценки времени, форматирование, правила быстрой записи |
+| `src/state/machine.ts` | Машина состояний (`reducer`): экраны `empty … readDone`, формы, операция, плашки ошибок |
+| `src/state/controller.ts` | Побочные эффекты: вызовы бэкенда, отмена, debounce слежения за файлом, сохранение настроек |
+| `src/components/`, `src/screens/` | Общие компоненты (`WindowChrome`, `FlashMap`, `ConfirmSheet`, …) и экраны |
+| `src/dev/DevPanel.tsx` | Dev-панель mock-режима |
+
+**Запуск:** `npm run dev` (браузер, http://localhost:1420) или `npm run tauri dev`. Проверки: `npm run build` (tsc + vite), `npm test` (vitest: `domain/` и reducer).
+
+**Dev-панель** есть только в mock-режиме: **⌥⌘D** (Alt+Ctrl+D вне macOS) открывает и закрывает её. С панели можно подключить или отключить программатор, сымитировать пересборку отслеживаемого файла (с новым CRC или с тем же), задать ошибку для следующей операции (`Disconnected` посреди записи или чтения, `CoreNotAccessible`, `FlashProtected`, `Busy`) и множитель скорости ×1/×5/×20. Сбросить сохранённые настройки быстрой записи: удалить ключи `stlink-ui.quick.*` в `localStorage`.
+
+**Клавиатура:** ⌘R (Ctrl+R) — быстрая запись на экранах «Устройство» и «Готово»; в sheet подтверждения Enter подтверждает, Esc отменяет, Tab не выходит за пределы sheet.
+
+**Окно Tauri:** 920×620 (это же минимальный размер), `titleBarStyle: Overlay` + `hiddenTitle`. Системные traffic lights выводятся поверх нашего titlebar, нарисованные кружки показываются только в браузере. В titlebar стоит `data-tauri-drag-region`, двойной клик разворачивает окно (разрешения в `capabilities/default.json`).
+
+**Ограничения mock-режима:** в браузере нет диалога сохранения: «Изменить…» спрашивает имя файла, результат чтения скачивается. В Tauri-webview скачивание не работает (файл не сохраняется), и drag-and-drop перехватывает сам Tauri. Это закроет `TauriBackend`.
+
+**Не нарисовано в макете** (помечено `TODO(design)` в коде): плашки ошибок, карточка МК во время и после неудачного подключения, карточка быстрой записи без файла, МК без драйвера flash.

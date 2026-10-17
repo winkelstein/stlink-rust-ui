@@ -1,0 +1,28 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-10-17T15:00:00Z"},"title":"stlink-rust-ui — GUI","launch":{"view":"canvas"},"pages":[],
+"boards":{
+"Main.dc.html":{"x":0,"y":0,"w":920,"h":620,"title":"Прототип (Play)","is_interactive":true,"radius":12},
+"Empty.dc.html":{"x":0,"y":1000,"w":920,"h":620,"title":"1 · Нет устройства","radius":12},
+"Device.dc.html":{"x":1000,"y":1000,"w":920,"h":620,"title":"2 · Устройство найдено","radius":12},
+"Write.dc.html":{"x":2000,"y":1000,"w":920,"h":620,"title":"3 · Запись: параметры","radius":12},
+"WriteConfirm.dc.html":{"x":3000,"y":1000,"w":920,"h":620,"title":"4 · Подтверждение стирания","radius":12},
+"WriteProgress.dc.html":{"x":4000,"y":1000,"w":920,"h":620,"title":"5 · Запись: прогресс","radius":12},
+"WriteDone.dc.html":{"x":5000,"y":1000,"w":920,"h":620,"title":"6 · Запись: готово","radius":12},
+"Read.dc.html":{"x":1000,"y":2000,"w":920,"h":620,"title":"3 · Чтение: параметры","radius":12},
+"ReadProgress.dc.html":{"x":2000,"y":2000,"w":920,"h":620,"title":"4 · Чтение: прогресс","radius":12},
+"ReadDone.dc.html":{"x":3000,"y":2000,"w":920,"h":620,"title":"5 · Чтение: готово","radius":12},
+"DeviceDark.dc.html":{"x":1000,"y":3000,"w":920,"h":620,"title":"Тёмная · Устройство","radius":12},
+"WriteDark.dc.html":{"x":2000,"y":3000,"w":920,"h":620,"title":"Тёмная · Запись","radius":12},
+"WriteProgressDark.dc.html":{"x":3000,"y":3000,"w":920,"h":620,"title":"Тёмная · Прогресс","radius":12},
+"QuickArmed.dc.html":{"x":0,"y":4000,"w":920,"h":620,"title":"Автозапись: ждём плату","radius":12}
+},
+"order":["Main.dc.html","Empty.dc.html","Device.dc.html","Write.dc.html","WriteConfirm.dc.html","WriteProgress.dc.html","WriteDone.dc.html","Read.dc.html","ReadProgress.dc.html","ReadDone.dc.html","DeviceDark.dc.html","WriteDark.dc.html","WriteProgressDark.dc.html","QuickArmed.dc.html"],
+"notes":{
+"tProto":{"x":0,"y":-300,"text":"Интерактивный прототип","kind":"title1","maxW":1920},
+"sProto":{"x":1000,"y":0,"w":360,"text":"Нажмите Play на прототипе. Подключение программатора симулируется через 3 с, дальше можно пройти запись и чтение целиком.","fill":"blue"},
+"tWrite":{"x":0,"y":720,"text":"Сценарий записи","kind":"title1","maxW":5920},
+"tRead":{"x":1000,"y":1720,"text":"Сценарий чтения","kind":"title1","maxW":2920},
+"tDark":{"x":1000,"y":2720,"text":"Тёмная тема (по системе)","kind":"title1","maxW":2920},
+"tQuick":{"x":0,"y":3720,"text":"Быстрая запись","kind":"title1","maxW":1920},
+"sQuick":{"x":1000,"y":4000,"w":380,"text":"Быстрая запись: последний файл и адрес запоминаются для каждого чипа (по UID). Кнопка «Записать ⌘R» на экране устройства запускает запись сразу, без мастера. Подтверждение пропускается, только если стираются те же сектора, что в прошлый раз; иначе показывается обычное окно. Автозапись при подключении срабатывает только на том же чипе (UID) и выключается при смене файла на другой. «При изменении файла»: приложение следит за .bin и перепрошивает плату, когда сборка его перезаписала. Запись стартует через ~1 с после последнего изменения (чтобы не схватить недописанный файл) и не запускается, если содержимое не поменялось (CRC тот же) или идёт другая операция.","fill":"orange"}
+},
+"designSystems":[]}

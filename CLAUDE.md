@@ -39,6 +39,7 @@ Desktop-приложение для STM32: чтение/запись проши�
 | `flash` | `dump`, `read_flash`, `plan_write`, `write_flash` (erase → program → verify), `read_protection`; драйверы через трейт `FlashDriver` (`flash/h7.rs`), геометрия/план — `flash/geometry.rs` |
 
 ## Заметки к Этапу 2 (UI)
+- **Дизайн:** `docs/design/README.md` (экраны, правила быстрой записи) и `docs/design/Main.dc.html` (вёрстка, CSS-токены светлой/тёмной темы, тексты всех экранов). Переносить в React + TS, сохраняя структуру и токены.
 - **Сценарий для GUI** (то же делает CLI, см. `stlink-cli/src/commands.rs`):
   `list_probes()` → `StLink::open(&desc)` → `target_voltage()` → `connect(&ConnectOptions)` → `identify()` → `dump(...)` / `plan_write(...)` + подтверждение (показать `plan.sectors`) → `write_flash(...)` → `reset_and_run()`; для чтения/probe — `release(&connection)`.
 - **Потоки:** один рабочий поток (актор) на устройство, команды сериализуются. `StLink`, `Error`, `ProbeDescriptor` — `Send` (проверяется при компиляции в `lib.rs`), не `Sync`. Всё API блокирующее, без async-рантайма. При drop `StLink` выходит из debug-режима.

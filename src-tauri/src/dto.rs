@@ -423,7 +423,10 @@ mod tests {
             probe_id: "1-1:7".into(),
         };
         let json = serde_json::to_value(&e).unwrap_or_default();
-        assert_eq!(json, serde_json::json!({ "type": "disconnected", "probeId": "1-1:7" }));
+        assert_eq!(
+            json,
+            serde_json::json!({ "type": "disconnected", "probeId": "1-1:7" })
+        );
     }
 
     #[test]

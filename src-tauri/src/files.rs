@@ -35,7 +35,9 @@ pub fn read_bin(path: impl AsRef<Path>) -> Result<Vec<u8>> {
             format!("«{name}»: поддерживаются только файлы .bin"),
         ));
     }
-    let len = std::fs::metadata(path).map_err(|e| io_error(path, e))?.len();
+    let len = std::fs::metadata(path)
+        .map_err(|e| io_error(path, e))?
+        .len();
     if len > MAX_FILE_SIZE {
         return Err(BackendError::other(format!(
             "{}: file too large ({len} bytes)",
@@ -87,7 +89,10 @@ impl Reporter {
         };
         let mut last = self.last.lock().unwrap_or_else(|e| e.into_inner());
         if last.as_ref() != Some(&meta) {
-            debug!("{} changed: {} bytes, CRC 0x{:08X}", meta.name, meta.size, meta.crc32);
+            debug!(
+                "{} changed: {} bytes, CRC 0x{:08X}",
+                meta.name, meta.size, meta.crc32
+            );
             *last = Some(meta.clone());
             drop(last);
             (self.on_change)(meta);
@@ -109,7 +114,11 @@ impl FileWatchers {
     /// temporary file, then rename). While the file is being written it may be
     /// missing or locked (Windows: sharing violation): then it is read again
     /// once a moment later, so the final state is not lost.
-    pub fn watch(&self, path: PathBuf, on_change: impl Fn(BinFile) + Send + Sync + 'static) -> Result<u64> {
+    pub fn watch(
+        &self,
+        path: PathBuf,
+        on_change: impl Fn(BinFile) + Send + Sync + 'static,
+    ) -> Result<u64> {
         let dir = path
             .parent()
             .map(Path::to_path_buf)
@@ -200,7 +209,10 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(matches!(seen, Some(f) if f.size == 9), "no change event after rename");
+        assert!(
+            matches!(seen, Some(f) if f.size == 9),
+            "no change event after rename"
+        );
         Ok(())
     }
 

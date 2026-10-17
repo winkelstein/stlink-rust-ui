@@ -467,13 +467,19 @@ mod tests {
         let t = target(0x450, Some(2 * 1024 * 1024));
         let out = |r: Result<usize>| matches!(r, Err(Error::OutOfFlash { .. }));
         // Exactly up to the end of flash.
-        assert_eq!(read_len(&t, 0x0800_0000, Some(0x20_0000)).ok(), Some(0x20_0000));
+        assert_eq!(
+            read_len(&t, 0x0800_0000, Some(0x20_0000)).ok(),
+            Some(0x20_0000)
+        );
         assert_eq!(read_len(&t, 0x081F_FFFC, Some(4)).ok(), Some(4));
         // One byte more.
         assert!(out(read_len(&t, 0x0800_0000, Some(0x20_0001))));
         assert!(out(read_len(&t, 0x081F_FFFC, Some(5))));
         // Inside bank 2.
-        assert_eq!(read_len(&t, 0x0810_0000, Some(0x10_0000)).ok(), Some(0x10_0000));
+        assert_eq!(
+            read_len(&t, 0x0810_0000, Some(0x10_0000)).ok(),
+            Some(0x10_0000)
+        );
         assert!(out(read_len(&t, 0x0810_0000, Some(0x10_0001))));
         // Before and after flash, RAM, end of the address space.
         assert!(out(read_len(&t, 0x07FF_FFFC, Some(4))));
@@ -569,14 +575,10 @@ mod tests {
     #[test]
     fn erase_banks_stops_on_error() {
         let mut calls = 0;
-        let r = erase_banks(
-            2,
-            &mut |_| ControlFlow::Continue(()),
-            |_| {
-                calls += 1;
-                Err(Error::FlashOperation { status: 0x20000 })
-            },
-        );
+        let r = erase_banks(2, &mut |_| ControlFlow::Continue(()), |_| {
+            calls += 1;
+            Err(Error::FlashOperation { status: 0x20000 })
+        });
         assert!(matches!(r, Err(Error::FlashOperation { .. })));
         assert_eq!(calls, 1);
     }
@@ -592,7 +594,13 @@ mod tests {
             erased_value: 0xFF,
         };
         assert_eq!(bank_count(&g), 2);
-        assert_eq!(bank_count(&FlashGeometry { bank_size: 2 << 20, ..g }), 1);
+        assert_eq!(
+            bank_count(&FlashGeometry {
+                bank_size: 2 << 20,
+                ..g
+            }),
+            1
+        );
     }
 
     #[test]

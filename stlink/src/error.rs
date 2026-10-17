@@ -122,7 +122,11 @@ const WIN_DEVICE_IN_USE: [u32; 2] = [5, 32];
 
 impl From<nusb::Error> for Error {
     fn from(err: nusb::Error) -> Self {
-        if cfg!(windows) && err.os_error().is_some_and(|c| WIN_DEVICE_IN_USE.contains(&c)) {
+        if cfg!(windows)
+            && err
+                .os_error()
+                .is_some_and(|c| WIN_DEVICE_IN_USE.contains(&c))
+        {
             return Error::Busy;
         }
         match err.kind() {

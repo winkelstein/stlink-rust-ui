@@ -12,8 +12,8 @@ use stlink::{ConnectOptions, Connection, ProbeDescriptor, StLink, TargetInfo};
 use tracing::{debug, info, warn};
 
 use crate::dto::{
-    ConnectionDto, DeviceSession, EraseResult, FlashPlan, ProbeInfo, ProbeSummary,
-    ProgressDto, ReadJob, ReadResult, StageMs, TargetInfoDto, WriteJob, WriteResult,
+    ConnectionDto, DeviceSession, EraseResult, FlashPlan, ProbeInfo, ProbeSummary, ProgressDto,
+    ReadJob, ReadResult, StageMs, TargetInfoDto, WriteJob, WriteResult,
 };
 use crate::error::{BackendError, ErrorKind, Result};
 use crate::files;
@@ -188,7 +188,10 @@ impl Worker {
             }),
             None => None,
         };
-        info!(chip = target.chip.map(|c| c.dev_type.as_str()), "identified");
+        info!(
+            chip = target.chip.map(|c| c.dev_type.as_str()),
+            "identified"
+        );
         let session = DeviceSession {
             probe: self.info.clone(),
             connection: ConnectionDto::from(&conn),
@@ -308,7 +311,10 @@ impl Worker {
                 check_cancel(cancel)
             })?;
             let size = target.flash_size.unwrap_or(0);
-            info!("flash erased: {banks} bank(s), {size} bytes in {:.0} ms", ms(started));
+            info!(
+                "flash erased: {banks} bank(s), {size} bytes in {:.0} ms",
+                ms(started)
+            );
             Ok(EraseResult {
                 banks,
                 size,
@@ -422,13 +428,22 @@ mod tests {
             std::process::Command::new(cmd)
                 .args(args)
                 .output()
-                .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).contains("Found 0"))
+                .is_ok_and(|o| {
+                    o.status.success() && !String::from_utf8_lossy(&o.stdout).contains("Found 0")
+                })
         };
         let st_info = || tool_ok("st-info", &["--probe"]);
         let openocd = || {
             tool_ok(
                 "openocd",
-                &["-f", "interface/stlink.cfg", "-f", "target/stm32h7x.cfg", "-c", "init; shutdown"],
+                &[
+                    "-f",
+                    "interface/stlink.cfg",
+                    "-f",
+                    "target/stm32h7x.cfg",
+                    "-c",
+                    "init; shutdown",
+                ],
             )
         };
         let opts = ConnectOptions {
@@ -439,7 +454,10 @@ mod tests {
         let mut w = Worker::new(desc);
         let s = w.connect_target(opts);
         assert!(matches!(&s, Ok(s) if s.target.chip_id == 0x450), "{s:?}");
-        assert!(!openocd(), "openocd must not get the probe while we hold it");
+        assert!(
+            !openocd(),
+            "openocd must not get the probe while we hold it"
+        );
 
         w.disconnect();
         assert!(st_info(), "st-info --probe after disconnect");

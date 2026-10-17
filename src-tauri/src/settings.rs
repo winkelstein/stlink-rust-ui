@@ -68,9 +68,8 @@ impl QuickWriteStore {
             data.insert(uid, settings);
             serde_json::to_vec_pretty(&*data).map_err(|e| BackendError::other(e.to_string()))?
         };
-        write_atomic(&self.path, &json).map_err(|e| {
-            BackendError::other(format!("cannot save {}: {e}", self.path.display()))
-        })
+        write_atomic(&self.path, &json)
+            .map_err(|e| BackendError::other(format!("cannot save {}: {e}", self.path.display())))
     }
 }
 
@@ -118,9 +117,8 @@ impl AppSettingsStore {
         let json =
             serde_json::to_vec_pretty(&settings).map_err(|e| BackendError::other(e.to_string()))?;
         *self.lock() = settings;
-        write_atomic(&self.path, &json).map_err(|e| {
-            BackendError::other(format!("cannot save {}: {e}", self.path.display()))
-        })
+        write_atomic(&self.path, &json)
+            .map_err(|e| BackendError::other(format!("cannot save {}: {e}", self.path.display())))
     }
 }
 
@@ -167,7 +165,10 @@ mod tests {
         let old = serde_json::json!({ "addr": 1, "onConnect": true, "onFileChange": false });
         assert!(store.save("U".into(), old).is_ok());
         let all = store.all();
-        assert_eq!(all[0].1, serde_json::json!({ "addr": 1, "onFileChange": false }));
+        assert_eq!(
+            all[0].1,
+            serde_json::json!({ "addr": 1, "onFileChange": false })
+        );
     }
 
     #[test]
@@ -175,7 +176,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("stlink-ui-app-{}", std::process::id()));
         let store = AppSettingsStore::load(dir.clone());
         assert!(!store.verbose_usb());
-        assert!(store.save(serde_json::json!({ "verboseUsb": true, "lang": "en" })).is_ok());
+        assert!(
+            store
+                .save(serde_json::json!({ "verboseUsb": true, "lang": "en" }))
+                .is_ok()
+        );
         let again = AppSettingsStore::load(dir);
         assert!(again.verbose_usb());
         assert_eq!(again.get()["lang"], "en");

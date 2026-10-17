@@ -83,7 +83,10 @@ mod tests {
             (stlink::Error::Unsupported("x"), ErrorKind::Unsupported),
             (stlink::Error::Cancelled, ErrorKind::Cancelled),
             (stlink::Error::Timeout, ErrorKind::Other),
-            (stlink::Error::Verify { addr: 0x0800_0000 }, ErrorKind::Other),
+            (
+                stlink::Error::Verify { addr: 0x0800_0000 },
+                ErrorKind::Other,
+            ),
         ];
         for (e, kind) in cases {
             assert_eq!(BackendError::from(e).kind, kind);

@@ -165,7 +165,8 @@ pub fn init(dir: Option<&Path>, verbose: bool) -> Logs {
             .ok()
     });
 
-    let (filter, handle) = reload::Layer::new(EnvFilter::new(if verbose { VERBOSE } else { NORMAL }));
+    let (filter, handle) =
+        reload::Layer::new(EnvFilter::new(if verbose { VERBOSE } else { NORMAL }));
     let journal = Arc::new(Mutex::new(Journal::default()));
     let stderr_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(STDERR_FILTER));

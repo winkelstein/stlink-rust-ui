@@ -10,16 +10,18 @@
 <helmet>
 <style>
 body{margin:0}
-.win{--bg:#F5F5F7;--bar:#ECECEE;--card:#FFFFFF;--sep:rgba(0,0,0,.10);--sep2:rgba(0,0,0,.18);--text:#1D1D1F;--text2:#5C5C61;--text3:#8E8E93;--fill:rgba(0,0,0,.05);--accent:#0A6CDB;--accentBtn:#0A63CC;--accentText:#0A5DBE;--accentSoft:rgba(10,108,219,.10);--ok:#1B7A37;--okSoft:rgba(27,122,55,.12);--warn:#9A4F00;--warnSoft:rgba(232,128,0,.14);--warnFill:#F0A030;--btnBg:#FFFFFF;--btnBorder:rgba(0,0,0,.14);--field:#FFFFFF;--dim:rgba(0,0,0,.18);--shadow:0 1px 2px rgba(0,0,0,.06)}
-.win.dark{--bg:#1C1C1E;--bar:#28282A;--card:#2C2C2E;--sep:rgba(255,255,255,.09);--sep2:rgba(255,255,255,.22);--text:#F5F5F7;--text2:#AEAEB2;--text3:#76767B;--fill:rgba(255,255,255,.07);--accent:#3D8BFF;--accentBtn:#0A63CC;--accentText:#6AA8FF;--accentSoft:rgba(61,139,255,.16);--ok:#43D46E;--okSoft:rgba(67,212,110,.14);--warn:#FFB547;--warnSoft:rgba(255,159,10,.18);--warnFill:#D98A22;--btnBg:#3A3A3C;--btnBorder:rgba(255,255,255,.08);--field:#1C1C1E;--dim:rgba(0,0,0,.45);--shadow:0 1px 2px rgba(0,0,0,.3)}
-.win button{font-family:inherit}
+.win{--bg:#F5F5F7;--bar:#ECECEE;--card:#FFFFFF;--sep:rgba(0,0,0,.10);--sep2:rgba(0,0,0,.18);--text:#1D1D1F;--text2:#5C5C61;--text3:#8E8E93;--fill:rgba(0,0,0,.05);--accent:#0A6CDB;--accentBtn:#0A63CC;--accentText:#0A5DBE;--accentSoft:rgba(10,108,219,.10);--ok:#1B7A37;--okSoft:rgba(27,122,55,.12);--warn:#9A4F00;--warnSoft:rgba(232,128,0,.14);--warnFill:#F0A030;--err:#C0262D;--errSoft:rgba(192,38,45,.10);--dangerBtn:#C62828;--btnBg:#FFFFFF;--btnBorder:rgba(0,0,0,.14);--field:#FFFFFF;--dim:rgba(0,0,0,.18);--shadow:0 1px 2px rgba(0,0,0,.06);--logBg:#FBFBFC}
+.win.dark{--bg:#1C1C1E;--bar:#28282A;--card:#2C2C2E;--sep:rgba(255,255,255,.09);--sep2:rgba(255,255,255,.22);--text:#F5F5F7;--text2:#AEAEB2;--text3:#76767B;--fill:rgba(255,255,255,.07);--accent:#3D8BFF;--accentBtn:#0A63CC;--accentText:#6AA8FF;--accentSoft:rgba(61,139,255,.16);--ok:#43D46E;--okSoft:rgba(67,212,110,.14);--warn:#FFB547;--warnSoft:rgba(255,159,10,.18);--warnFill:#D98A22;--err:#FF6B6B;--errSoft:rgba(255,107,107,.14);--dangerBtn:#C62828;--btnBg:#3A3A3C;--btnBorder:rgba(255,255,255,.08);--field:#1C1C1E;--dim:rgba(0,0,0,.45);--shadow:0 1px 2px rgba(0,0,0,.3);--logBg:#1F1F21}
+.win button,.win select,.win input{font-family:inherit}
 .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
 .btn{height:30px;padding:0 14px;border-radius:7px;font-size:13px;border:1px solid var(--btnBorder);background:var(--btnBg);color:var(--text);box-shadow:var(--shadow);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .btn-primary{background:var(--accentBtn);border-color:transparent;color:#fff}
+.btn-danger{background:var(--dangerBtn);border-color:transparent;color:#fff}
+.btn-sm{height:26px;padding:0 10px;font-size:12px}
 .btn kbd{font-family:inherit;font-size:11px;opacity:.75}
 .icon-btn{width:30px;height:30px;border-radius:7px;border:0;background:transparent;color:var(--text2);display:grid;place-items:center;cursor:pointer}
-.icon-btn:hover{background:var(--fill)}
-.step{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text3)}
+.icon-btn:hover,.icon-btn.on{background:var(--fill);color:var(--text)}
+.step{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text3);white-space:nowrap}
 .step .n{width:18px;height:18px;border-radius:50%;border:1px solid var(--sep2);display:grid;place-items:center;font-size:10.5px;font-weight:600}
 .step.active{color:var(--text);font-weight:600}
 .step.active .n{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -31,34 +33,51 @@ body{margin:0}
 .kv .k{color:var(--text2)}
 .kv .v{color:var(--text);text-align:right}
 .eyebrow{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text2)}
-.chip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:13px;background:var(--fill);font-size:12px;color:var(--text2)}
-.led{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--okSoft)}
-.tile{flex:1;display:flex;align-items:center;gap:14px;padding:12px 16px;text-align:left;border-radius:10px;border:1px solid var(--sep);background:var(--card);color:var(--text);cursor:pointer;box-shadow:var(--shadow)}
+.chip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:13px;background:var(--fill);font-size:12px;color:var(--text2);white-space:nowrap}
+.led{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--okSoft);flex:none}
+.led.off{background:var(--text3);box-shadow:0 0 0 3px var(--fill)}
+.tile{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:12px 14px;text-align:left;border-radius:10px;border:1px solid var(--sep);background:var(--card);color:var(--text);cursor:pointer;box-shadow:var(--shadow)}
 .tile:hover{border-color:var(--accent)}
-.tile .ic{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;background:var(--accentSoft);color:var(--accentText);flex:none}
+.tile .ic{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:var(--accentSoft);color:var(--accentText);flex:none}
+.tile.danger .ic{background:var(--errSoft);color:var(--err)}
+.tile.danger:hover{border-color:var(--err)}
 .field{height:30px;border-radius:7px;border:1px solid var(--sep2);background:var(--field);color:var(--text);padding:0 10px;font-size:13px;box-sizing:border-box;width:100%}
 .field:disabled{color:var(--text2);background:var(--fill)}
 .label{font-size:12px;color:var(--text2);display:block;margin-bottom:6px}
 .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
-.check input{width:15px;height:15px;accent-color:var(--accent);margin:0}
+.check input{width:15px;height:15px;accent-color:var(--accent);margin:0;flex:none}
+.hint{font-size:11.5px;color:var(--text2);margin:3px 0 0 23px;line-height:1.4}
 .sec{flex:1;height:46px;border-radius:4px;background:var(--fill)}
 .sec.erase{background:var(--warnSoft);box-shadow:inset 0 0 0 1px var(--warnFill)}
 .sw{width:10px;height:10px;border-radius:3px;flex:none}
 .seg{display:flex;padding:2px;border-radius:8px;background:var(--fill);gap:2px}
-.seg button{flex:1;height:26px;border:0;border-radius:6px;background:transparent;color:var(--text);font-size:12.5px;cursor:pointer}
+.seg button{flex:1;height:26px;border:0;border-radius:6px;background:transparent;color:var(--text);font-size:12.5px;cursor:pointer;white-space:nowrap;padding:0 8px}
 .seg button.on{background:var(--btnBg);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 .5px var(--btnBorder);font-weight:600}
 .bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
 .bar>div{height:100%;border-radius:3px;background:var(--accent);transition:width .09s linear}
+.bar.danger>div{background:var(--err)}
 .stage{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--sep)}
 .stage:first-child{border-top:0}
 .st-ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none}
 .st-ic.done{background:var(--ok);color:#fff}
-.st-ic.pending{border:1.5px dashed var(--sep2)}
+.st-ic.pending{border:1.5px dashed var(--sep2);box-sizing:border-box}
 .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--accentSoft);border-top-color:var(--accent);animation:spin .8s linear infinite;box-sizing:border-box}
 .spin.sm{width:12px;height:12px;border-width:1.5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.5);opacity:0}}
 .pulse{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);animation:pulse 2.2s ease-out infinite}
+.scrim{position:absolute;left:0;right:0;top:52px;bottom:0;background:var(--dim);display:flex;justify-content:center;align-items:flex-start;z-index:5}
+.sheet{background:var(--card);border:1px solid var(--sep);border-top:0;border-radius:0 0 12px 12px;box-shadow:0 18px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;box-sizing:border-box}
+.group{border:1px solid var(--sep);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.lvl{display:inline-block;width:44px;text-align:center;font-size:10px;font-weight:700;border-radius:4px;padding:1px 0}
+.lvl.INFO{background:var(--accentSoft);color:var(--accentText)}
+.lvl.WARN{background:var(--warnSoft);color:var(--warn)}
+.lvl.ERROR{background:var(--errSoft);color:var(--err)}
+.lvl.DEBUG,.lvl.TRACE{background:var(--fill);color:var(--text2)}
+.logrow{display:flex;gap:10px;align-items:baseline;padding:4px 14px;font-size:11.5px;line-height:1.45;border-bottom:1px solid var(--sep)}
+.logrow .ts{color:var(--text2);flex:none}
+.logrow .msg{color:var(--text);word-break:break-all}
+.logrow.err{background:var(--errSoft)}
 </style>
 </helmet>
 <div class="win {{themeClass}}" style="width: 920px; height: 620px; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; position: relative; overflow: hidden; border-radius: 12px">
@@ -70,18 +89,18 @@ body{margin:0}
 <span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span>
 <span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span>
 </div>
-<ol aria-label="Шаги" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 10px; list-style: none; margin: 0; padding: 0">
-<li class="{{s1}}"><span class="n">1</span>Устройство</li>
+<ol aria-label="{{t.steps}}" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 10px; list-style: none; margin: 0; padding: 0">
+<li class="{{s1}}"><span class="n">1</span>{{t.stepDevice}}</li>
 <li aria-hidden="true" style="width: 28px; height: 1px; background: var(--sep2)"></li>
-<li class="{{s2}}"><span class="n">2</span>Параметры</li>
+<li class="{{s2}}"><span class="n">2</span>{{t.stepParams}}</li>
 <li aria-hidden="true" style="width: 28px; height: 1px; background: var(--sep2)"></li>
-<li class="{{s3}}"><span class="n">3</span>Выполнение</li>
+<li class="{{s3}}"><span class="n">3</span>{{t.stepRun}}</li>
 </ol>
 <div style="display: flex; gap: 2px; width: 120px; justify-content: flex-end">
-<button class="icon-btn" aria-label="Журнал">
+<button class="{{logBtnCls}}" aria-label="{{t.log}}" title="{{t.log}}" onClick="{{openLog}}">
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6"/></svg>
 </button>
-<button class="icon-btn" aria-label="Настройки">
+<button class="{{setBtnCls}}" aria-label="{{t.settings}}" title="{{t.settings}}" onClick="{{openSettings}}">
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></svg>
 </button>
 </div>
@@ -97,112 +116,149 @@ body{margin:0}
 <svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="10" y="18" width="30" height="20" rx="4"/><path d="M40 22h6v12h-6"/><path d="M43 26v4"/><circle cx="18" cy="28" r="2"/><path d="M24 28h10"/></svg>
 </div>
 </div>
-<h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em">Подключите программатор</h1>
-<p style="margin: 0; max-width: 420px; text-align: center; color: var(--text2); font-size: 13.5px; line-height: 1.5">ST-Link по USB или плату в режиме DFU (BOOT0 = 1). Устройство появится здесь автоматически.</p>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em">{{t.emptyTitle}}</h1>
+<p style="margin: 0; max-width: 440px; text-align: center; color: var(--text2); font-size: 13.5px; line-height: 1.5">{{t.emptyText}}</p>
 <div style="display: flex; gap: 8px; margin-top: 6px">
 <span class="chip">ST-Link V2 · V2-1 · V3</span>
 <span class="chip">STM32 USB DFU</span>
 </div>
-<sc-if value="{{isArmed}}" hint-placeholder-val="{{ false }}">
-<div class="card" style="margin-top: 18px; padding: 10px 10px 10px 14px; display: flex; align-items: center; gap: 12px; font-size: 12.5px; max-width: 560px">
-<span class="led" style="background: var(--accent); box-shadow: 0 0 0 3px var(--accentSoft)"></span>
-<span style="flex: 1; line-height: 1.45">Автозапись включена: <b>blinky-h743.bin</b> запишется сразу после подключения этого же STM32H743</span>
-<button class="btn" style="height: 26px" onClick="{{toggleAuto}}">Выключить</button>
-</div>
-</sc-if>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
 <span class="spin sm" aria-hidden="true"></span>
-<span style="font-size: 12px; color: var(--text2)">Ожидание устройства…</span>
+<span style="font-size: 12px; color: var(--text2)">{{t.waiting}}</span>
+</div>
+</div>
+</sc-if>
+
+<!-- 1b · Программатор свободен -->
+<sc-if value="{{isReleased}}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px">
+<div style="width: 96px; height: 96px; border-radius: 50%; background: var(--fill); color: var(--text2); display: grid; place-items: center; margin-bottom: 6px">
+<svg width="52" height="52" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="10" y="18" width="30" height="20" rx="4"/><path d="M40 22h6v12h-6"/><path d="M22 24v8M28 24v8"/></svg>
+</div>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em">{{t.relTitle}}</h1>
+<p style="margin: 0; max-width: 460px; text-align: center; color: var(--text2); font-size: 13.5px; line-height: 1.5">{{t.relText}}</p>
+<button class="btn btn-primary" style="height: 34px; padding: 0 20px; font-size: 13.5px; margin-top: 6px" onClick="{{connect}}">{{t.connect}}</button>
+<section class="card" style="margin-top: 12px; padding: 6px 16px; width: 380px">
+<div class="kv"><span class="k">{{t.programmer}}</span><span class="v">ST-Link V2 · <span class="mono">0483:3748</span></span></div>
+<div class="kv"><span class="k">{{t.serial}}</span><span class="v mono">37FF71064E57343641412543</span></div>
+</section>
+</div>
+<div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
+<span class="chip"><span class="led off"></span>{{t.chipReleased}}</span>
+<div style="flex: 1"></div>
+<span style="font-size: 12px; color: var(--text2)">{{t.relFooter}}</span>
 </div>
 </div>
 </sc-if>
 
 <!-- 2 · Устройство -->
-<sc-if value="{{isDevice}}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{isDeviceBase}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
-<div style="flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 20px 28px">
-<section class="card" aria-label="Быстрая запись" style="padding: 12px 14px 12px 14px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow), inset 0 0 0 1px var(--accentSoft)">
+<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 18px 28px">
+<section class="card" aria-label="{{t.quick}}" style="padding: 12px 14px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow), inset 0 0 0 1px var(--accentSoft)">
 <div style="width: 34px; height: 40px; border-radius: 6px; background: var(--accentSoft); color: var(--accentText); display: grid; place-items: center; flex: none">
 <span class="mono" style="font-size: 9px; font-weight: 700">.BIN</span>
 </div>
 <div style="flex: 1; min-width: 0">
 <div style="display: flex; align-items: center; gap: 8px">
-<span class="eyebrow">Быстрая запись</span>
+<span class="eyebrow">{{t.quick}}</span>
 <span class="chip" style="height: 18px; padding: 0 7px; font-size: 10.5px; background: var(--accentSoft); color: var(--accentText)">{{quickChip}}</span>
 </div>
 <div style="font-size: 13.5px; font-weight: 600; margin-top: 3px">blinky-h743.bin <span class="mono" style="font-weight: 400; font-size: 12px; color: var(--text2)">→ 0x08000000</span></div>
 </div>
 <div style="display: flex; flex-direction: column; gap: 7px; flex: none">
-<label class="check" style="font-size: 12.5px"><input type="checkbox" checked="{{isArmed}}" onChange="{{toggleAuto}}">При подключении платы</label>
-<label class="check" style="font-size: 12.5px"><input type="checkbox" checked="{{isWatch}}" onChange="{{toggleWatch}}">При изменении файла</label>
+<label class="check" style="font-size: 12.5px"><input type="checkbox" checked="{{isWatch}}" onChange="{{toggleWatch}}">{{t.onChange}}</label>
 </div>
-<button class="btn btn-primary" style="flex: none" onClick="{{quickWrite}}">Записать <kbd>⌘R</kbd></button>
+<button class="btn btn-primary" style="flex: none" onClick="{{quickWrite}}">{{t.flashBtn}} <kbd>⌘R</kbd></button>
 </section>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
-<section class="card" style="padding: 14px 18px">
-<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
+<section class="card" style="padding: 12px 18px">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px">
 <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--fill); color: var(--text2); display: grid; place-items: center">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="12" height="8" rx="2"/><path d="M14 8h3v4h-3"/></svg>
 </div>
 <div style="flex: 1">
-<div class="eyebrow">Программатор</div>
+<div class="eyebrow">{{t.programmer}}</div>
 <div style="font-size: 15px; font-weight: 600; margin-top: 2px">ST-Link V2</div>
 </div>
-<span class="chip" style="height: 22px; font-size: 11px"><span class="led"></span>Подключён</span>
+<span class="chip" style="height: 22px; font-size: 11px"><span class="led"></span>{{t.connected}}</span>
 </div>
 <div class="kv"><span class="k">USB</span><span class="v mono">0483:3748</span></div>
-<div class="kv"><span class="k">Прошивка</span><span class="v mono">V2J46S7</span></div>
-<div class="kv"><span class="k">Серийный номер</span><span class="v mono">37FF71064E57343641412543</span></div>
-<div class="kv"><span class="k">Напряжение</span><span class="v">3,28 В</span></div>
-<div class="kv"><span class="k">Частота SWD</span><span class="v">1,8 МГц</span></div>
+<div class="kv"><span class="k">{{t.firmware}}</span><span class="v mono">V2J46S7</span></div>
+<div class="kv"><span class="k">{{t.serial}}</span><span class="v mono">37FF71064E57343641412543</span></div>
+<div class="kv"><span class="k">{{t.voltage}}</span><span class="v">{{t.volts}}</span></div>
+<div class="kv"><span class="k">{{t.swd}}</span><span class="v">{{swdLabel}}</span></div>
 </section>
-<section class="card" style="padding: 14px 18px">
-<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px">
+<section class="card" style="padding: 12px 18px">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px">
 <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accentSoft); color: var(--accentText); display: grid; place-items: center">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5"/><path d="M8 2v3M12 2v3M8 15v3M12 15v3M2 8h3M2 12h3M15 8h3M15 12h3"/></svg>
 </div>
 <div style="flex: 1">
-<div class="eyebrow">Микроконтроллер</div>
+<div class="eyebrow">{{t.mcu}}</div>
 <div style="font-size: 15px; font-weight: 600; margin-top: 2px">STM32H743 / H753</div>
 </div>
 </div>
-<div class="kv"><span class="k">Ядро</span><span class="v">Cortex-M7 r1p1 · <span class="mono">0x450</span></span></div>
-<div class="kv"><span class="k">Flash</span><span class="v">2 МБ · 2 банка по 8 секторов</span></div>
-<div class="kv"><span class="k">SRAM</span><span class="v">1 МБ</span></div>
+<div class="kv"><span class="k">{{t.core}}</span><span class="v">Cortex-M7 r1p1 · <span class="mono">0x450</span></span></div>
+<div class="kv"><span class="k">Flash</span><span class="v">{{t.flashVal}}</span></div>
+<div class="kv"><span class="k">SRAM</span><span class="v">{{t.sramVal}}</span></div>
 <div class="kv"><span class="k">UID</span><span class="v mono">003A0029 3133510D 36383837</span></div>
-<div class="kv"><span class="k">Защита чтения</span><span class="v" style="color: var(--ok); font-weight: 600">RDP 0 · нет</span></div>
+<div class="kv"><span class="k">{{t.rdp}}</span><span class="v" style="color: var(--ok); font-weight: 600">{{t.rdpVal}}</span></div>
 </section>
 </div>
 <div>
-<div class="eyebrow" style="margin-bottom: 8px">Другое действие</div>
-<div style="display: flex; gap: 16px">
+<div class="eyebrow" style="margin-bottom: 8px">{{t.other}}</div>
+<div style="display: flex; gap: 12px">
 <button class="tile" onClick="{{toWrite}}">
 <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9M6 8l4 4 4-4M3 14v2.5h14V14"/></svg></span>
-<span style="flex: 1"><span style="display: block; font-size: 14px; font-weight: 600">Записать прошивку</span><span style="display: block; font-size: 12px; color: var(--text2); margin-top: 3px">.bin → flash · стирание и проверка</span></span>
-<span aria-hidden="true" style="color: var(--text3); font-size: 18px">›</span>
+<span style="flex: 1; min-width: 0"><span style="display: block; font-size: 13.5px; font-weight: 600">{{t.tileWrite}}</span><span style="display: block; font-size: 11.5px; color: var(--text2); margin-top: 3px">{{t.tileWriteSub}}</span></span>
 </button>
 <button class="tile" onClick="{{toRead}}">
 <span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 12V3M6 7l4-4 4 4M3 14v2.5h14V14"/></svg></span>
-<span style="flex: 1"><span style="display: block; font-size: 14px; font-weight: 600">Прочитать в файл</span><span style="display: block; font-size: 12px; color: var(--text2); margin-top: 3px">flash → .bin · ядро не останавливается</span></span>
-<span aria-hidden="true" style="color: var(--text3); font-size: 18px">›</span>
+<span style="flex: 1; min-width: 0"><span style="display: block; font-size: 13.5px; font-weight: 600">{{t.tileRead}}</span><span style="display: block; font-size: 11.5px; color: var(--text2); margin-top: 3px">{{t.tileReadSub}}</span></span>
+</button>
+<button class="tile danger" onClick="{{toEraseConfirm}}">
+<span class="ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V3.5h4v2M5 5.5l.8 11h8.4l.8-11M8.5 8.5v5M11.5 8.5v5"/></svg></span>
+<span style="flex: 1; min-width: 0"><span style="display: block; font-size: 13.5px; font-weight: 600">{{t.tileErase}}</span><span style="display: block; font-size: 11.5px; color: var(--text2); margin-top: 3px">{{t.tileEraseSub}}</span></span>
 </button>
 </div>
 </div>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>1 устройство</span>
+<span class="chip"><span class="led"></span>{{t.chipConnected}}</span>
+<button class="btn" title="{{t.releaseHint}}" onClick="{{release}}">
+<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H6M10.5 11 14 8l-3.5-3M14 8H6"/></svg>{{t.release}}</button>
 <div style="flex: 1"></div>
-<button class="btn">Сбросить МК</button>
+<button class="btn" title="{{t.rebootHint}}">
+<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5"/></svg>{{t.reboot}}</button>
 </div>
 </div>
 </sc-if>
 
-<!-- 3 · Запись: параметры (+ 4 · подтверждение поверх) -->
+<!-- Подтверждение полного стирания -->
+<sc-if value="{{isEraseConfirm}}" hint-placeholder-val="{{ false }}">
+<div class="scrim">
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="er-title" style="width: 460px; padding: 22px 24px 18px; gap: 12px">
+<div style="width: 40px; height: 40px; border-radius: 10px; background: var(--errSoft); color: var(--err); display: grid; place-items: center">
+<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V3.5h4v2M5 5.5l.8 11h8.4l.8-11M8.5 8.5v5M11.5 8.5v5"/></svg>
+</div>
+<h3 id="er-title" style="margin: 0; font-size: 15px; font-weight: 600">{{t.eraseCfTitle}}</h3>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2)">{{t.eraseCf1}} (<span class="mono">0x08000000–0x081FFFFF</span>, {{t.mb2}}) {{t.eraseCf2}}</p>
+<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px">
+<button class="btn" onClick="{{toDevice}}">{{t.cancel}}</button>
+<button class="btn btn-danger" onClick="{{startErase}}">{{t.eraseAllBtn}}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- 3 · Запись: параметры (+ подтверждение поверх) -->
 <sc-if value="{{isWriteForm}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 22px 28px">
-<h2 style="margin: 0; font-size: 18px; font-weight: 600">Запись прошивки</h2>
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{t.writeTitle}}</h2>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
 <div style="display: flex; flex-direction: column; gap: 14px">
 <section class="card" style="padding: 14px 16px; display: flex; align-items: center; gap: 12px">
@@ -211,24 +267,24 @@ body{margin:0}
 </div>
 <div style="flex: 1; min-width: 0">
 <div style="font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">blinky-h743.bin</div>
-<div style="font-size: 12px; color: var(--text2); margin-top: 3px">183 КБ (187 392 байт) · изменён в 14:02</div>
+<div style="font-size: 12px; color: var(--text2); margin-top: 3px">{{t.fileMeta}}</div>
 </div>
-<button class="btn">Выбрать…</button>
+<button class="btn">{{t.choose}}</button>
 </section>
-<p style="margin: -6px 0 0; font-size: 11.5px; color: var(--text2)">Или перетащите .bin в окно</p>
+<p style="margin: -6px 0 0; font-size: 11.5px; color: var(--text2)">{{t.dropHint}}</p>
 <div>
-<label class="label" for="addr">Адрес записи</label>
+<label class="label" for="addr">{{t.addr}}</label>
 <input id="addr" class="field mono" value="{{addr}}" onChange="{{setAddr}}">
-<div style="font-size: 11.5px; color: var(--ok); margin-top: 6px">Начало flash, банк 1 · выровнено по сектору</div>
+<div style="font-size: 11.5px; color: var(--ok); margin-top: 6px">{{t.addrOk}}</div>
 </div>
 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 2px">
-<label class="check"><input type="checkbox" checked="{{verify}}" onChange="{{toggleVerify}}">Проверить после записи</label>
-<label class="check"><input type="checkbox" checked="{{resetAfter}}" onChange="{{toggleReset}}">Сбросить и запустить МК</label>
-<label class="check"><input type="checkbox" checked="{{isWatch}}" onChange="{{toggleWatch}}">Перезаписывать при изменении файла</label>
+<label class="check"><input type="checkbox" checked="{{verify}}" onChange="{{toggleVerify}}">{{t.verify}}</label>
+<label class="check"><input type="checkbox" checked="{{resetAfter}}" onChange="{{toggleReset}}">{{t.resetAfter}}</label>
+<label class="check"><input type="checkbox" checked="{{isWatch}}" onChange="{{toggleWatch}}">{{t.watch}}</label>
 </div>
 </div>
 <section class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
-<div class="eyebrow">Карта flash · 2 МБ</div>
+<div class="eyebrow">{{t.map}}</div>
 <div style="position: relative">
 <div style="display: flex; gap: 3px">
 <sc-for list="{{sectors}}" as="s" hint-placeholder-count="16">
@@ -238,54 +294,54 @@ body{margin:0}
 <div aria-hidden="true" style="position: absolute; left: 0; bottom: 0; width: 8.9%; height: 18px; border-radius: 0 0 4px 4px; background: var(--accent)"></div>
 </div>
 <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text2)">
-<span class="mono">Банк 1 · 0x08000000</span>
-<span class="mono">Банк 2 · 0x08100000</span>
+<span class="mono">{{t.bank1}} · 0x08000000</span>
+<span class="mono">{{t.bank2}} · 0x08100000</span>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--sep); font-size: 12px">
-<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--warnSoft); box-shadow: inset 0 0 0 1px var(--warnFill)"></span><span style="flex: 1">Будут стёрты: сектора 0–1, банк 1</span><span style="color: var(--text2)">256 КБ</span></div>
-<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--accent)"></span><span style="flex: 1">Прошивка <span class="mono" style="color: var(--text2)">0x08000000–0x0802DBFF</span></span><span style="color: var(--text2)">183 КБ</span></div>
-<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--fill)"></span><span style="flex: 1">Не изменится</span><span style="color: var(--text2)">1,75 МБ</span></div>
+<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--warnSoft); box-shadow: inset 0 0 0 1px var(--warnFill)"></span><span style="flex: 1">{{t.willErase}}</span><span style="color: var(--text2)">{{t.kb256}}</span></div>
+<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--accent)"></span><span style="flex: 1">{{t.fw}} <span class="mono" style="color: var(--text2)">0x08000000–0x0802DBFF</span></span><span style="color: var(--text2)">{{t.kb183}}</span></div>
+<div style="display: flex; gap: 8px; align-items: center"><span class="sw" style="background: var(--fill)"></span><span style="flex: 1">{{t.unchanged}}</span><span style="color: var(--text2)">{{t.mb175}}</span></div>
 </div>
-<div style="font-size: 12px; color: var(--text2)">Примерно 4 с: стирание 1,9 с · запись 1,3 с · проверка 0,9 с</div>
+<div style="font-size: 12px; color: var(--text2)">{{t.estimate}}</div>
 </section>
 </div>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>ST-Link V2 · STM32H743 · 3,28 В</span>
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
 <div style="flex: 1"></div>
-<button class="btn" onClick="{{toDevice}}">Назад</button>
-<button class="btn btn-primary" onClick="{{toConfirm}}">Стереть и записать</button>
+<button class="btn" onClick="{{toDevice}}">{{t.back}}</button>
+<button class="btn btn-primary" onClick="{{toConfirm}}">{{t.eraseWrite}}</button>
 </div>
 </div>
 </sc-if>
 
 <sc-if value="{{isConfirm}}" hint-placeholder-val="{{ false }}">
-<div style="position: absolute; left: 0; right: 0; top: 52px; bottom: 0; background: var(--dim); display: flex; justify-content: center; align-items: flex-start">
-<div role="dialog" aria-modal="true" aria-labelledby="cf-title" style="width: 440px; margin-top: 0; padding: 22px 24px 18px; background: var(--card); border: 1px solid var(--sep); border-top: 0; border-radius: 0 0 12px 12px; box-shadow: 0 18px 40px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 12px">
+<div class="scrim">
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cf-title" style="width: 440px; padding: 22px 24px 18px; gap: 12px">
 <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--warnSoft); color: var(--warn); display: grid; place-items: center">
 <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3 2.5 18h17z"/><path d="M11 9v4.5M11 16v.01"/></svg>
 </div>
-<h3 id="cf-title" style="margin: 0; font-size: 15px; font-weight: 600">Стереть 2 сектора и записать прошивку?</h3>
-<p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2)">Сектора 0–1 банка 1 (<span class="mono">0x08000000–0x0803FFFF</span>, 256 КБ) будут стёрты. Остальная память не изменится.</p>
+<h3 id="cf-title" style="margin: 0; font-size: 15px; font-weight: 600">{{t.cfTitle}}</h3>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2)">{{t.cf1}} (<span class="mono">0x08000000–0x0803FFFF</span>, {{t.kb256}}) {{t.cf2}}</p>
 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px">
-<button class="btn" onClick="{{toWrite}}">Отмена</button>
-<button class="btn btn-primary" onClick="{{startWrite}}">Стереть и записать</button>
+<button class="btn" onClick="{{toWrite}}">{{t.cancel}}</button>
+<button class="btn btn-primary" onClick="{{startWrite}}">{{t.eraseWrite}}</button>
 </div>
 </div>
 </div>
 </sc-if>
 
-<!-- 5 · Запись: прогресс -->
-<sc-if value="{{isWriteProgress}}" hint-placeholder-val="{{ false }}">
+<!-- Прогресс (запись или полное стирание) -->
+<sc-if value="{{isProgress}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; padding: 24px 120px">
 <div>
 <div style="display: flex; align-items: baseline; justify-content: space-between">
-<h2 style="margin: 0; font-size: 18px; font-weight: 600">Запись blinky-h743.bin</h2>
-<span class="mono" style="font-size: 22px; font-weight: 600">{{wTotalPct}}</span>
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{progTitle}}</h2>
+<span class="mono" style="font-size: 22px; font-weight: 600">{{totalPct}}</span>
 </div>
-<div style="font-size: 12.5px; color: var(--text2); margin: 4px 0 12px">STM32H743 · <span class="mono">0x08000000</span> · осталось {{wLeft}}</div>
-<div class="bar" style="height: 8px; border-radius: 4px"><div style="width: {{wTotalPct}}"></div></div>
+<div style="font-size: 12.5px; color: var(--text2); margin: 4px 0 12px">{{progSub}}</div>
+<div class="{{barCls}}" style="height: 8px; border-radius: 4px"><div style="width: {{totalPct}}"></div></div>
 </div>
 <section class="card" style="padding: 4px 18px">
 <sc-for list="{{stages}}" as="st" hint-placeholder-count="3">
@@ -298,40 +354,64 @@ body{margin:0}
 <span style="font-size: 13.5px; font-weight: 600; color: {{st.labelColor}}">{{st.label}}</span>
 <span class="mono" style="font-size: 12px; color: var(--text2)">{{st.detail}}</span>
 </div>
-<sc-if value="{{st.isActive}}" hint-placeholder-val="{{ false }}"><div class="bar" style="margin-top: 8px"><div style="width: {{st.bar}}"></div></div></sc-if>
+<sc-if value="{{st.isActive}}" hint-placeholder-val="{{ false }}"><div class="{{barCls}}" style="margin-top: 8px"><div style="width: {{st.bar}}"></div></div></sc-if>
 </div>
 </div>
 </sc-for>
 </section>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span style="font-size: 12px; color: var(--warn); display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3 2.5 18h17z"/><path d="M11 9v4.5M11 16v.01"/></svg>Не отключайте программатор</span>
+<span style="font-size: 12px; color: var(--warn); display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3 2.5 18h17z"/><path d="M11 9v4.5M11 16v.01"/></svg>{{t.dontUnplug}}</span>
 <div style="flex: 1"></div>
-<button class="btn" onClick="{{toWrite}}">Отменить</button>
+<button class="btn" onClick="{{cancelProgress}}">{{t.abort}}</button>
 </div>
 </div>
 </sc-if>
 
-<!-- 6 · Запись: готово -->
+<!-- Готово: запись -->
 <sc-if value="{{isWriteDone}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px">
 <div style="width: 72px; height: 72px; border-radius: 50%; background: var(--okSoft); color: var(--ok); display: grid; place-items: center; margin-bottom: 6px">
 <svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 17.5 5.5 5.5L25.5 11"/></svg>
 </div>
-<h1 style="margin: 0; font-size: 22px; font-weight: 600">Прошивка записана и проверена</h1>
-<p style="margin: 0; color: var(--text2); font-size: 13.5px">blinky-h743.bin · 183 КБ за 4,1 с · МК перезапущен</p>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">{{t.doneTitle}}</h1>
+<p style="margin: 0; color: var(--text2); font-size: 13.5px">{{t.doneSub}}</p>
 <section class="card" style="margin-top: 10px; padding: 6px 18px; width: 380px">
-<div class="kv"><span class="k">Область</span><span class="v mono">0x08000000–0x0802DBFF</span></div>
-<div class="kv"><span class="k">Стёрто</span><span class="v">2 сектора · 256 КБ</span></div>
+<div class="kv"><span class="k">{{t.region}}</span><span class="v mono">0x08000000–0x0802DBFF</span></div>
+<div class="kv"><span class="k">{{t.erased}}</span><span class="v">{{t.erasedVal}}</span></div>
 <div class="kv"><span class="k">CRC32</span><span class="v mono">0x9A41C2F7</span></div>
 </section>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>ST-Link V2 · STM32H743 · 3,28 В</span>
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
 <div style="flex: 1"></div>
-<button class="btn" onClick="{{toDevice}}">К устройству</button>
-<button class="btn btn-primary" onClick="{{startWrite}}">Записать снова <kbd>⌘R</kbd></button>
+<button class="btn" onClick="{{toDevice}}">{{t.toDevice}}</button>
+<button class="btn btn-primary" onClick="{{startWrite}}">{{t.again}} <kbd>⌘R</kbd></button>
+</div>
+</div>
+</sc-if>
+
+<!-- Готово: полное стирание -->
+<sc-if value="{{isEraseDone}}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px">
+<div style="width: 72px; height: 72px; border-radius: 50%; background: var(--okSoft); color: var(--ok); display: grid; place-items: center; margin-bottom: 6px">
+<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 17.5 5.5 5.5L25.5 11"/></svg>
+</div>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">{{t.eraseDoneTitle}}</h1>
+<p style="margin: 0; color: var(--text2); font-size: 13.5px">{{t.eraseDoneSub}}</p>
+<section class="card" style="margin-top: 10px; padding: 6px 18px; width: 380px">
+<div class="kv"><span class="k">{{t.region}}</span><span class="v mono">0x08000000–0x081FFFFF</span></div>
+<div class="kv"><span class="k">{{t.banks}}</span><span class="v">{{t.banksVal}}</span></div>
+<div class="kv"><span class="k">{{t.mcuState}}</span><span class="v">{{t.mcuHalted}}</span></div>
+</section>
+</div>
+<div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
+<div style="flex: 1"></div>
+<button class="btn" onClick="{{toDevice}}">{{t.toDevice}}</button>
+<button class="btn btn-primary" onClick="{{toWrite}}">{{t.tileWrite}}</button>
 </div>
 </div>
 </sc-if>
@@ -340,19 +420,19 @@ body{margin:0}
 <sc-if value="{{isRead}}" hint-placeholder-val="{{ false }}">
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; gap: 18px; padding: 22px 28px">
-<h2 style="margin: 0; font-size: 18px; font-weight: 600">Чтение в файл</h2>
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{t.readTitle}}</h2>
 <section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 16px">
 <div>
-<span class="label">Что прочитать</span>
-<div class="seg" role="group" aria-label="Область чтения">
+<span class="label">{{t.what}}</span>
+<div class="seg" role="group" aria-label="{{t.what}}">
 <sc-for list="{{ranges}}" as="r" hint-placeholder-count="4">
 <button class="{{r.cls}}" onClick="{{r.pick}}">{{r.label}}</button>
 </sc-for>
 </div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
-<div><label class="label" for="r-start">Начальный адрес</label><input id="r-start" class="field mono" value="{{rStart}}" disabled="{{rLocked}}" onChange="{{noop}}"></div>
-<div><label class="label" for="r-size">Размер</label><input id="r-size" class="field mono" value="{{rSize}}" disabled="{{rLocked}}" onChange="{{noop}}"></div>
+<div><label class="label" for="r-start">{{t.start}}</label><input id="r-start" class="field mono" value="{{rStart}}" disabled="{{rLocked}}" onChange="{{noop}}"></div>
+<div><label class="label" for="r-size">{{t.size}}</label><input id="r-size" class="field mono" value="{{rSize}}" disabled="{{rLocked}}" onChange="{{noop}}"></div>
 </div>
 </section>
 <section class="card" style="padding: 14px 16px; display: flex; align-items: center; gap: 12px">
@@ -363,15 +443,15 @@ body{margin:0}
 <div class="mono" style="font-size: 13px; font-weight: 600">{{rFile}}</div>
 <div style="font-size: 12px; color: var(--text2); margin-top: 3px">~/Downloads</div>
 </div>
-<button class="btn">Изменить…</button>
+<button class="btn">{{t.change}}</button>
 </section>
 <div style="font-size: 12px; color: var(--text2)">{{rEstimate}}</div>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>ST-Link V2 · STM32H743 · 3,28 В</span>
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
 <div style="flex: 1"></div>
-<button class="btn" onClick="{{toDevice}}">Назад</button>
-<button class="btn btn-primary" onClick="{{startRead}}">Прочитать</button>
+<button class="btn" onClick="{{toDevice}}">{{t.back}}</button>
+<button class="btn btn-primary" onClick="{{startRead}}">{{t.readBtn}}</button>
 </div>
 </div>
 </sc-if>
@@ -381,20 +461,20 @@ body{margin:0}
 <div style="flex: 1; display: flex; flex-direction: column; min-height: 0">
 <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px 120px">
 <div style="display: flex; align-items: baseline; justify-content: space-between">
-<h2 style="margin: 0; font-size: 18px; font-weight: 600">Чтение flash</h2>
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{t.readingTitle}}</h2>
 <span class="mono" style="font-size: 22px; font-weight: 600">{{rPct}}</span>
 </div>
 <div class="bar" style="height: 8px; border-radius: 4px"><div style="width: {{rPct}}"></div></div>
 <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text2)">
 <span class="mono">{{rDone}}</span>
-<span>148 КБ/с · осталось {{rLeft}}</span>
+<span>{{rSpeed}}</span>
 </div>
-<div style="margin-top: 14px; font-size: 12px; color: var(--text2)">В файл <span class="mono">{{rFile}}</span> · ядро продолжает работать</div>
+<div style="margin-top: 14px; font-size: 12px; color: var(--text2)">{{t.toFile}} <span class="mono">{{rFile}}</span> · {{t.coreRuns}}</div>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>ST-Link V2 · STM32H743 · 3,28 В</span>
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
 <div style="flex: 1"></div>
-<button class="btn" onClick="{{toRead}}">Отменить</button>
+<button class="btn" onClick="{{toRead}}">{{t.abort}}</button>
 </div>
 </div>
 </sc-if>
@@ -406,35 +486,269 @@ body{margin:0}
 <div style="width: 72px; height: 72px; border-radius: 50%; background: var(--okSoft); color: var(--ok); display: grid; place-items: center; margin-bottom: 6px">
 <svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 17.5 5.5 5.5L25.5 11"/></svg>
 </div>
-<h1 style="margin: 0; font-size: 22px; font-weight: 600">Файл сохранён</h1>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">{{t.saved}}</h1>
 <p class="mono" style="margin: 0; color: var(--text2); font-size: 13px">~/Downloads/{{rFile}}</p>
 <section class="card" style="margin-top: 10px; padding: 6px 18px; width: 380px">
-<div class="kv"><span class="k">Область</span><span class="v mono">0x08000000–0x081FFFFF</span></div>
-<div class="kv"><span class="k">Размер</span><span class="v">2 МБ · 2 097 152 байт</span></div>
-<div class="kv"><span class="k">Время</span><span class="v">14,2 с</span></div>
+<div class="kv"><span class="k">{{t.region}}</span><span class="v mono">0x08000000–0x081FFFFF</span></div>
+<div class="kv"><span class="k">{{t.size}}</span><span class="v">{{t.sizeVal}}</span></div>
+<div class="kv"><span class="k">{{t.time}}</span><span class="v">{{t.timeVal}}</span></div>
 <div class="kv"><span class="k">CRC32</span><span class="v mono">0x5D0E8B21</span></div>
 </section>
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
-<span class="chip"><span class="led"></span>ST-Link V2 · STM32H743 · 3,28 В</span>
+<span class="chip"><span class="led"></span>{{t.devChip}}</span>
 <div style="flex: 1"></div>
-<button class="btn">Показать в Finder</button>
-<button class="btn btn-primary" onClick="{{toDevice}}">Готово</button>
+<button class="btn">{{t.finder}}</button>
+<button class="btn btn-primary" onClick="{{toDevice}}">{{t.done}}</button>
+</div>
+</div>
+</sc-if>
+
+<!-- Настройки -->
+<sc-if value="{{isSettings}}" hint-placeholder-val="{{ false }}">
+<div class="scrim">
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="set-title" style="width: 760px; padding: 18px 22px 16px; gap: 14px">
+<h3 id="set-title" style="margin: 0; font-size: 15px; font-weight: 600">{{t.settings}}</h3>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="group">
+<div class="eyebrow">{{t.general}}</div>
+<div>
+<span class="label">{{t.language}}</span>
+<div class="seg" role="group" aria-label="{{t.language}}">
+<sc-for list="{{langs}}" as="o" hint-placeholder-count="3"><button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for>
+</div>
+</div>
+<div>
+<span class="label">{{t.appearance}}</span>
+<div class="seg" role="group" aria-label="{{t.appearance}}">
+<sc-for list="{{themes}}" as="o" hint-placeholder-count="3"><button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for>
+</div>
+</div>
+</div>
+<div class="group">
+<div class="eyebrow">{{t.flashing}}</div>
+<label class="check"><input type="checkbox" checked="{{verify}}" onChange="{{toggleVerify}}">{{t.verify}}</label>
+<label class="check"><input type="checkbox" checked="{{resetAfter}}" onChange="{{toggleReset}}">{{t.resetAfter}}</label>
+<div>
+<label class="check"><input type="checkbox" checked="{{alwaysConfirm}}" onChange="{{toggleConfirm}}">{{t.alwaysConfirm}}</label>
+<div class="hint">{{t.alwaysConfirmHint}}</div>
+</div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="group">
+<div class="eyebrow">{{t.programmer}}</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<label for="swd" style="font-size: 13px; flex: 1">{{t.swd}}</label>
+<select id="swd" class="field" style="width: 130px" value="{{swd}}" onChange="{{setSwd}}">
+<option value="4000">{{t.f4000}}</option>
+<option value="1800">{{t.f1800}}</option>
+<option value="950">{{t.f950}}</option>
+<option value="480">{{t.f480}}</option>
+</select>
+</div>
+<div>
+<label class="check"><input type="checkbox" checked="{{underReset}}" onChange="{{toggleUnderReset}}">{{t.underReset}}</label>
+<div class="hint">{{t.underResetHint}}</div>
+</div>
+<div>
+<label class="check"><input type="checkbox" checked="{{keepDebug}}" onChange="{{toggleKeepDebug}}">{{t.keepDebug}}</label>
+<div class="hint">{{t.keepDebugHint}}</div>
+</div>
+</div>
+<div class="group">
+<div class="eyebrow">{{t.log}}</div>
+<div>
+<label class="check"><input type="checkbox" checked="{{verbose}}" onChange="{{toggleVerbose}}">{{t.verbose}}</label>
+<div class="hint">{{t.verboseHint}}</div>
+</div>
+</div>
+</div>
+</div>
+<div style="display: flex; justify-content: flex-end">
+<button class="btn btn-primary" onClick="{{closeOverlay}}">{{t.done}}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- Журнал -->
+<sc-if value="{{isLog}}" hint-placeholder-val="{{ false }}">
+<div class="scrim">
+<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="log-title" style="width: 860px; height: 520px; padding: 16px 0 0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 0 16px 12px; border-bottom: 1px solid var(--sep)">
+<h3 id="log-title" style="margin: 0; font-size: 15px; font-weight: 600">{{t.log}}</h3>
+<div class="seg" role="group" aria-label="{{t.filter}}" style="width: 260px">
+<sc-for list="{{logFilters}}" as="o" hint-placeholder-count="3"><button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button></sc-for>
+</div>
+<div style="flex: 1"></div>
+<button class="btn btn-sm">{{t.copy}}</button>
+<button class="btn btn-sm">{{t.saveLog}}</button>
+<button class="btn btn-sm">{{t.clear}}</button>
+</div>
+<div class="mono" style="flex: 1; overflow: auto; background: var(--logBg); padding: 6px 0">
+<sc-for list="{{logRows}}" as="l" hint-placeholder-count="10">
+<div class="{{l.rowCls}}">
+<span class="ts">{{l.ts}}</span>
+<span class="{{l.lvlCls}}">{{l.lvl}}</span>
+<span class="msg">{{l.msg}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--sep)">
+<label class="check" style="font-size: 12.5px"><input type="checkbox" checked="{{verbose}}" onChange="{{toggleVerbose}}">{{t.verbose}}</label>
+<div style="flex: 1"></div>
+<span style="font-size: 12px; color: var(--text2)">{{logCount}}</span>
+<button class="btn btn-primary" onClick="{{closeOverlay}}">{{t.close}}</button>
+</div>
 </div>
 </div>
 </sc-if>
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"screen":{"editor":"enum","options":["empty","device","write","confirm","writeProgress","writeDone","read","readProgress","readDone"],"default":"empty"},"auto":{"editor":"boolean","default":false},"watch":{"editor":"boolean","default":false},"demo":{"editor":null},"$preview":{"width":920,"height":620}}'>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"lang":{"editor":"enum","options":["ru","en"],"default":"ru"},"screen":{"editor":"enum","options":["empty","released","device","eraseConfirm","eraseProgress","eraseDone","write","confirm","writeProgress","writeDone","read","readProgress","readDone"],"default":"empty"},"overlay":{"editor":"enum","options":["none","settings","log"],"default":"none"},"watch":{"editor":"boolean","default":false},"demo":{"editor":null},"$preview":{"width":920,"height":620}}'>
+const T = {
+  ru: {
+    steps: 'Шаги', stepDevice: 'Устройство', stepParams: 'Параметры', stepRun: 'Выполнение',
+    log: 'Журнал', settings: 'Настройки',
+    emptyTitle: 'Подключите программатор',
+    emptyText: 'ST-Link по USB или плату в режиме DFU (BOOT0 = 1). Устройство появится здесь автоматически.',
+    waiting: 'Ожидание устройства…',
+    armed1: 'Автозапись включена:', armed2: 'запишется сразу после подключения этого же STM32H743', turnOff: 'Выключить',
+    relTitle: 'Программатор отключён',
+    relText: 'ST-Link V2 найден. Нажмите «Подключиться», чтобы начать работу. Пока программатор отключён, им могут пользоваться VS Code, OpenOCD или st-flash.',
+    connect: 'Подключиться',
+    chipReleased: 'ST-Link V2 · отключён', relFooter: 'Приложение не подключается к программатору само',
+    quick: 'Быстрая запись', changedAgo: 'изменён 2 мин назад', watching: 'слежу за файлом',
+    onConnect: 'При подключении платы', onChange: 'При изменении файла', flashBtn: 'Записать',
+    programmer: 'Программатор', connected: 'Подключён', firmware: 'Прошивка', serial: 'Серийный номер',
+    voltage: 'Напряжение', volts: '3,28 В', swd: 'Частота SWD',
+    mcu: 'Микроконтроллер', core: 'Ядро', flashVal: '2 МБ · 2 банка по 8 секторов', sramVal: '1 МБ',
+    rdp: 'Защита чтения', rdpVal: 'RDP 0 · нет',
+    other: 'Другие действия',
+    tileWrite: 'Записать прошивку', tileWriteSub: '.bin → flash, с проверкой',
+    tileRead: 'Прочитать в файл', tileReadSub: 'flash → .bin',
+    tileErase: 'Стереть всё', tileEraseSub: 'весь flash, 2 МБ',
+    chipConnected: 'ST-Link V2 · подключён', release: 'Отключить',
+    releaseHint: 'Отключиться от программатора, чтобы им могли пользоваться VS Code, OpenOCD или st-flash',
+    reboot: 'Перезагрузить МК', rebootHint: 'Аппаратный сброс и запуск прошивки',
+    eraseCfTitle: 'Стереть весь flash?',
+    eraseCf1: 'Оба банка', eraseCf2: 'будут стёрты полностью: прошивка, загрузчик и данные во flash. Отменить это нельзя.',
+    mb2: '2 МБ', cancel: 'Отмена', eraseAllBtn: 'Стереть всё',
+    writeTitle: 'Запись прошивки', fileMeta: '183 КБ (187 392 байт) · изменён в 14:02', choose: 'Выбрать…',
+    dropHint: 'Или перетащите .bin в окно', addr: 'Адрес записи', addrOk: 'Начало flash, банк 1 · выровнено по сектору',
+    verify: 'Проверять после записи', resetAfter: 'Перезагружать МК после записи', watch: 'Перезаписывать при изменении файла',
+    map: 'Карта flash · 2 МБ', bank1: 'Банк 1', bank2: 'Банк 2',
+    willErase: 'Будут стёрты: сектора 0–1, банк 1', kb256: '256 КБ', fw: 'Прошивка', kb183: '183 КБ',
+    unchanged: 'Не изменится', mb175: '1,75 МБ',
+    estimate: 'Примерно 4 с: стирание 1,9 с · запись 1,3 с · проверка 0,9 с',
+    back: 'Назад', eraseWrite: 'Стереть и записать', devChip: 'ST-Link V2 · STM32H743 · 3,28 В',
+    cfTitle: 'Стереть 2 сектора и записать прошивку?', cf1: 'Сектора 0–1 банка 1', cf2: 'будут стёрты. Остальная память не изменится.',
+    writing: 'Запись blinky-h743.bin', erasing: 'Полное стирание',
+    dontUnplug: 'Не отключайте программатор', abort: 'Отменить',
+    doneTitle: 'Прошивка записана и проверена', doneSub: 'blinky-h743.bin · 183 КБ за 4,1 с · МК перезагружен',
+    region: 'Область', erased: 'Стёрто', erasedVal: '2 сектора · 256 КБ', toDevice: 'К устройству', again: 'Записать снова',
+    eraseDoneTitle: 'Flash стёрт', eraseDoneSub: '2 МБ за 7,6 с · все байты 0xFF',
+    banks: 'Банки', banksVal: '1 и 2', mcuState: 'МК', mcuHalted: 'остановлен, прошивки нет',
+    readTitle: 'Чтение в файл', what: 'Что прочитать', start: 'Начальный адрес', size: 'Размер', change: 'Изменить…',
+    readBtn: 'Прочитать', readingTitle: 'Чтение flash', toFile: 'В файл', coreRuns: 'ядро продолжает работать',
+    saved: 'Файл сохранён', sizeVal: '2 МБ · 2 097 152 байт', time: 'Время', timeVal: '14,2 с', finder: 'Показать в Finder', done: 'Готово',
+    general: 'Общие', language: 'Язык', appearance: 'Оформление', flashing: 'Запись',
+    alwaysConfirm: 'Всегда спрашивать перед стиранием', alwaysConfirmHint: 'Иначе быстрая запись не спрашивает, если стираются те же сектора',
+    autoConnect: 'Подключаться автоматически', autoConnectHint: 'Выключите, если программатором пользуется VS Code или OpenOCD',
+    underReset: 'Подключаться со сбросом', underResetHint: 'Для прошивок, которые отключают SWD или засыпают',
+    keepDebug: 'Держать отладку в low-power', keepDebugHint: 'Пишет DBGMCU_CR, действует до выключения питания',
+    verbose: 'Подробный журнал USB', verboseHint: 'Каждый пакет в hex. Нужен для отчётов об ошибках',
+    f4000: '4 МГц', f1800: '1,8 МГц', f950: '950 кГц', f480: '480 кГц',
+    filter: 'Фильтр', copy: 'Копировать', saveLog: 'Сохранить…', clear: 'Очистить', close: 'Закрыть',
+    sys: 'Системный', sysTheme: 'Системное', light: 'Светлое', darkT: 'Тёмное',
+    fAll: 'Все', fErr: 'Ошибки', fUsb: 'USB'
+  },
+  en: {
+    steps: 'Steps', stepDevice: 'Device', stepParams: 'Options', stepRun: 'Run',
+    log: 'Log', settings: 'Settings',
+    emptyTitle: 'Connect a programmer',
+    emptyText: 'An ST-Link over USB, or a board in DFU mode (BOOT0 = 1). It will show up here automatically.',
+    waiting: 'Waiting for a device…',
+    armed1: 'Auto-flash is on:', armed2: 'will be flashed as soon as this same STM32H743 is connected', turnOff: 'Turn off',
+    relTitle: 'Programmer disconnected',
+    relText: 'ST-Link V2 is detected. Press Connect to start. While it is disconnected, VS Code, OpenOCD or st-flash can use it.',
+    connect: 'Connect',
+    chipReleased: 'ST-Link V2 · disconnected', relFooter: 'The app never connects to the programmer on its own',
+    quick: 'Quick flash', changedAgo: 'changed 2 min ago', watching: 'watching file',
+    onConnect: 'When the board connects', onChange: 'When the file changes', flashBtn: 'Flash',
+    programmer: 'Programmer', connected: 'Connected', firmware: 'Firmware', serial: 'Serial number',
+    voltage: 'Voltage', volts: '3.28 V', swd: 'SWD clock',
+    mcu: 'Microcontroller', core: 'Core', flashVal: '2 MB · 2 banks × 8 sectors', sramVal: '1 MB',
+    rdp: 'Read protection', rdpVal: 'RDP 0 · none',
+    other: 'Other actions',
+    tileWrite: 'Flash firmware', tileWriteSub: '.bin → flash, verified',
+    tileRead: 'Read to file', tileReadSub: 'flash → .bin',
+    tileErase: 'Erase all', tileEraseSub: 'entire flash, 2 MB',
+    chipConnected: 'ST-Link V2 · connected', release: 'Disconnect',
+    releaseHint: 'Disconnect from the programmer so VS Code, OpenOCD or st-flash can use it',
+    reboot: 'Restart MCU', rebootHint: 'Hardware reset, then run the firmware',
+    eraseCfTitle: 'Erase the entire flash?',
+    eraseCf1: 'Both banks', eraseCf2: 'will be fully erased: firmware, bootloader and any data in flash. This cannot be undone.',
+    mb2: '2 MB', cancel: 'Cancel', eraseAllBtn: 'Erase all',
+    writeTitle: 'Flash firmware', fileMeta: '183 KB (187,392 bytes) · modified 14:02', choose: 'Choose…',
+    dropHint: 'Or drop a .bin onto the window', addr: 'Address', addrOk: 'Start of flash, bank 1 · sector-aligned',
+    verify: 'Verify after writing', resetAfter: 'Restart MCU after writing', watch: 'Re-flash when the file changes',
+    map: 'Flash map · 2 MB', bank1: 'Bank 1', bank2: 'Bank 2',
+    willErase: 'Will be erased: sectors 0–1, bank 1', kb256: '256 KB', fw: 'Firmware', kb183: '183 KB',
+    unchanged: 'Unchanged', mb175: '1.75 MB',
+    estimate: 'About 4 s: erase 1.9 s · write 1.3 s · verify 0.9 s',
+    back: 'Back', eraseWrite: 'Erase and flash', devChip: 'ST-Link V2 · STM32H743 · 3.28 V',
+    cfTitle: 'Erase 2 sectors and flash the firmware?', cf1: 'Sectors 0–1 of bank 1', cf2: 'will be erased. The rest of the memory stays unchanged.',
+    writing: 'Flashing blinky-h743.bin', erasing: 'Erasing flash',
+    dontUnplug: 'Do not unplug the programmer', abort: 'Cancel',
+    doneTitle: 'Firmware flashed and verified', doneSub: 'blinky-h743.bin · 183 KB in 4.1 s · MCU restarted',
+    region: 'Range', erased: 'Erased', erasedVal: '2 sectors · 256 KB', toDevice: 'Back to device', again: 'Flash again',
+    eraseDoneTitle: 'Flash erased', eraseDoneSub: '2 MB in 7.6 s · all bytes 0xFF',
+    banks: 'Banks', banksVal: '1 and 2', mcuState: 'MCU', mcuHalted: 'halted, no firmware',
+    readTitle: 'Read to file', what: 'What to read', start: 'Start address', size: 'Size', change: 'Change…',
+    readBtn: 'Read', readingTitle: 'Reading flash', toFile: 'To', coreRuns: 'core keeps running',
+    saved: 'File saved', sizeVal: '2 MB · 2,097,152 bytes', time: 'Time', timeVal: '14.2 s', finder: 'Show in Finder', done: 'Done',
+    general: 'General', language: 'Language', appearance: 'Appearance', flashing: 'Flashing',
+    alwaysConfirm: 'Always confirm before erasing', alwaysConfirmHint: 'Otherwise quick flash skips it when the same sectors are erased',
+    autoConnect: 'Connect automatically', autoConnectHint: 'Turn off if VS Code or OpenOCD uses the programmer',
+    underReset: 'Connect under reset', underResetHint: 'For firmware that disables SWD or goes to sleep',
+    keepDebug: 'Keep debug in low-power modes', keepDebugHint: 'Writes DBGMCU_CR, lasts until power-off',
+    verbose: 'Verbose USB log', verboseHint: 'Every packet in hex. Useful for bug reports',
+    f4000: '4 MHz', f1800: '1.8 MHz', f950: '950 kHz', f480: '480 kHz',
+    filter: 'Filter', copy: 'Copy', saveLog: 'Save…', clear: 'Clear', close: 'Close',
+    sys: 'System', sysTheme: 'System', light: 'Light', darkT: 'Dark',
+    fAll: 'All', fErr: 'Errors', fUsb: 'USB'
+  }
+};
+const LOG = [
+  ['14:31:58.402', 'INFO', 'probe found: ST-Link V2 0483:3748, serial 37FF71064E57343641412543'],
+  ['14:31:58.409', 'TRACE', '→ F1 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 (GET_VERSION)'],
+  ['14:31:58.410', 'TRACE', '← 2E 87 83 04 48 37 (ST-Link v2, JTAG v46, SWIM v7)'],
+  ['14:31:58.415', 'INFO', 'firmware V2J46S7, api v2, target voltage 3.28 V'],
+  ['14:31:58.433', 'DEBUG', 'swd clock set to 1800 kHz'],
+  ['14:31:58.471', 'INFO', 'target: STM32H74x_H75x (0x450), Cortex-M7 r1p1, flash 2 MiB, rdp 0'],
+  ['14:32:03.120', 'INFO', 'write plan: erase sectors 0-1 of bank 1 (256 KiB)'],
+  ['14:32:05.044', 'INFO', 'erase done in 1.92 s'],
+  ['14:32:06.341', 'INFO', 'programmed 187392 bytes in 1.30 s (141 KiB/s)'],
+  ['14:32:06.342', 'TRACE', '→ F2 3E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 (GETLASTRWSTATUS2)'],
+  ['14:32:06.343', 'TRACE', '← 80 00 00 00 00 00 00 00 00 00 00 00 (OK)'],
+  ['14:32:07.118', 'INFO', 'verify ok, crc32 0x9A41C2F7'],
+  ['14:32:07.140', 'INFO', 'reset and run'],
+  ['14:35:12.006', 'WARN', 'usb transfer timed out after 1000 ms, retrying'],
+  ['14:35:12.410', 'ERROR', 'probe disconnected'],
+  ['14:35:14.882', 'INFO', 'probe found: ST-Link V2 0483:3748, serial 37FF71064E57343641412543'],
+  ['14:35:14.950', 'INFO', 'target: STM32H74x_H75x (0x450), Cortex-M7 r1p1, flash 2 MiB, rdp 0']
+];
 class Component extends DCLogic {
   componentDidMount() {
     if (!this.props.screen && this.props.demo !== false) {
       this.t0 = setTimeout(() => {
         const st = this.state || {};
         if (st.screen) return;
-        if (st.auto ?? !!this.props.auto) this.startWrite();
-        else this.setState({ screen: 'device' });
+        this.setState({ screen: 'released' });
       }, 3000);
     }
   }
@@ -446,21 +760,24 @@ class Component extends DCLogic {
     clearInterval(this.iv);
     this.setState({ screen: screen, running: false });
   }
-  startWrite() {
+  run(job, phases, steps, doneScreen) {
     clearInterval(this.iv);
-    this.setState({ screen: 'writeProgress', running: true, phase: 'erase', pct: 0 });
+    this.setState({ screen: job === 'erase' ? 'eraseProgress' : 'writeProgress', running: true, phase: phases[0], pct: 0 });
     this.iv = setInterval(() => {
       const st = this.state || {};
-      let phase = st.phase;
-      let pct = st.pct + (phase === 'erase' ? 5 : phase === 'program' ? 7 : 11);
+      const i = phases.indexOf(st.phase);
+      let pct = st.pct + steps[i];
       if (pct >= 100) {
-        if (phase === 'erase') { phase = 'program'; pct = 0; }
-        else if (phase === 'program') { phase = 'verify'; pct = 0; }
-        else { clearInterval(this.iv); this.setState({ screen: 'writeDone', running: false }); return; }
+        if (i + 1 < phases.length) { this.setState({ phase: phases[i + 1], pct: 0 }); return; }
+        clearInterval(this.iv);
+        this.setState({ screen: doneScreen, running: false });
+        return;
       }
-      this.setState({ phase: phase, pct: pct });
+      this.setState({ pct: pct });
     }, 90);
   }
+  startWrite() { this.run('write', ['erase', 'program', 'verify'], [5, 7, 11], 'writeDone'); }
+  startErase() { this.run('erase', ['b1', 'b2'], [3, 3], 'eraseDone'); }
   startRead() {
     clearInterval(this.iv);
     this.setState({ screen: 'readProgress', running: true, pct: 0 });
@@ -474,94 +791,167 @@ class Component extends DCLogic {
   renderVals() {
     const st = this.state || {};
     const p = this.props;
-    const fmt = (n, d) => n.toFixed(d).replace('.', ',');
+    const lang = st.lang ?? (p.lang === 'en' ? 'en' : 'ru');
+    const t = T[lang];
+    const L = lang === 'en';
+    const num = (n, d) => (L ? n.toFixed(d) : n.toFixed(d).replace('.', ','));
+    const KB = L ? 'KB' : 'КБ';
+    const sec = L ? 's' : 'с';
     const scr = st.screen || p.screen || 'empty';
+    const overlay = st.overlay !== undefined ? st.overlay : (p.overlay && p.overlay !== 'none' ? p.overlay : null);
     const running = !!st.running;
+    const theme = st.theme || 'system';
+    const isDark = theme === 'dark' || (theme === 'system' && !!p.dark);
 
-    const stepOf = { empty: 1, device: 1, write: 2, confirm: 2, read: 2, writeProgress: 3, writeDone: 3, readProgress: 3, readDone: 3 }[scr] || 1;
+    const stepOf = { empty: 1, released: 1, device: 1, eraseConfirm: 1, write: 2, confirm: 2, read: 2, writeProgress: 3, writeDone: 3, eraseProgress: 3, eraseDone: 3, readProgress: 3, readDone: 3 }[scr] || 1;
     const cls = (n) => (n < stepOf ? 'step done' : n === stepOf ? 'step active' : 'step');
 
-    // write progress
-    const phase = running ? st.phase : 'program';
-    const pct = running ? st.pct : 62;
-    const order = ['erase', 'program', 'verify'];
-    const weights = [45, 31, 24];
-    const secs = [1.9, 1.3, 0.9];
-    const idx = order.indexOf(phase);
+    // progress: write or full erase
+    const isErase = scr === 'eraseProgress';
+    const phases = isErase ? ['b1', 'b2'] : ['erase', 'program', 'verify'];
+    const weights = isErase ? [50, 50] : [45, 31, 24];
+    const phase = running ? st.phase : (isErase ? 'b2' : 'program');
+    const pct = running ? st.pct : (isErase ? 40 : 62);
+    const idx = phases.indexOf(phase);
     let total = 0;
-    for (let i = 0; i < 3; i++) total += i < idx ? weights[i] : i === idx ? weights[i] * pct / 100 : 0;
-    const left = Math.max(0, (100 - total) / 100 * 4.1);
-    const labels = ['Стирание', 'Программирование', 'Проверка'];
-    const doneDetail = ['2 сектора · 1,9 с', '183 КБ · 1,3 с', 'совпадает · 0,9 с'];
-    const activeDetail = [
-      'сектор ' + (pct < 50 ? 1 : 2) + ' из 2',
-      Math.round(pct) + ' % · ' + Math.round(183 * pct / 100) + ' из 183 КБ · 137 КБ/с',
-      Math.round(pct) + ' %'
-    ];
-    const stages = order.map((o, i) => ({
+    for (let i = 0; i < phases.length; i++) total += i < idx ? weights[i] : i === idx ? weights[i] * pct / 100 : 0;
+    const left = Math.max(0, (100 - total) / 100 * (isErase ? 7.6 : 4.1));
+    const P = Math.round(pct);
+    const labels = isErase ? [t.bank1, t.bank2] : (L ? ['Erasing', 'Programming', 'Verifying'] : ['Стирание', 'Программирование', 'Проверка']);
+    const doneDetail = isErase
+      ? [L ? '1 MB · 3.8 s' : '1 МБ · 3,8 с', L ? '1 MB · 3.8 s' : '1 МБ · 3,8 с']
+      : (L ? ['2 sectors · 1.9 s', '183 KB · 1.3 s', 'match · 0.9 s'] : ['2 сектора · 1,9 с', '183 КБ · 1,3 с', 'совпадает · 0,9 с']);
+    const activeDetail = isErase
+      ? [L ? 'sector ' + (Math.floor(pct / 12.5) + 1) + ' of 8' : 'сектор ' + (Math.floor(pct / 12.5) + 1) + ' из 8', L ? 'sector ' + (Math.floor(pct / 12.5) + 1) + ' of 8' : 'сектор ' + (Math.floor(pct / 12.5) + 1) + ' из 8']
+      : [
+        (L ? 'sector ' : 'сектор ') + (pct < 50 ? 1 : 2) + (L ? ' of 2' : ' из 2'),
+        P + ' % · ' + Math.round(183 * pct / 100) + (L ? ' of 183 ' : ' из 183 ') + KB + ' · 137 ' + KB + (L ? '/s' : '/с'),
+        P + ' %'
+      ];
+    const stages = phases.map((o, i) => ({
       label: labels[i],
       isDone: i < idx,
       isActive: i === idx,
       isPending: i > idx,
-      detail: i < idx ? doneDetail[i] : i === idx ? activeDetail[i] : 'ожидание',
-      bar: Math.round(pct) + '%',
+      detail: i < idx ? doneDetail[i] : i === idx ? activeDetail[i] : (L ? 'waiting' : 'ожидание'),
+      bar: P + '%',
       labelColor: i > idx ? 'var(--text2)' : 'var(--text)'
     }));
+    const leftStr = L ? num(left, 1) + ' s left' : 'осталось ' + num(left, 1) + ' с';
 
     // read
     const range = st.range || 'all';
+    const est = (mb, s) => (L ? 'About ' + s + ' s · ' + mb + ' at 148 KB/s' : 'Примерно ' + s + ' с · ' + mb + ' при 148 КБ/с');
     const rmap = {
-      all: { start: '0x08000000', size: '0x200000 · 2 МБ', est: 'Примерно 14 с · 2 МБ при 148 КБ/с', file: 'STM32H743_flash_2026-10-17.bin' },
-      b1: { start: '0x08000000', size: '0x100000 · 1 МБ', est: 'Примерно 7 с · 1 МБ при 148 КБ/с', file: 'STM32H743_bank1_2026-10-17.bin' },
-      b2: { start: '0x08100000', size: '0x100000 · 1 МБ', est: 'Примерно 7 с · 1 МБ при 148 КБ/с', file: 'STM32H743_bank2_2026-10-17.bin' },
-      custom: { start: '0x08000000', size: '0x40000', est: 'Примерно 2 с · 256 КБ при 148 КБ/с', file: 'STM32H743_08000000_2026-10-17.bin' }
+      all: { start: '0x08000000', size: L ? '0x200000 · 2 MB' : '0x200000 · 2 МБ', est: est(L ? '2 MB' : '2 МБ', 14), file: 'STM32H743_flash_2026-10-17.bin' },
+      b1: { start: '0x08000000', size: L ? '0x100000 · 1 MB' : '0x100000 · 1 МБ', est: est(L ? '1 MB' : '1 МБ', 7), file: 'STM32H743_bank1_2026-10-17.bin' },
+      b2: { start: '0x08100000', size: L ? '0x100000 · 1 MB' : '0x100000 · 1 МБ', est: est(L ? '1 MB' : '1 МБ', 7), file: 'STM32H743_bank2_2026-10-17.bin' },
+      custom: { start: '0x08000000', size: '0x40000', est: est(L ? '256 KB' : '256 КБ', 2), file: 'STM32H743_08000000_2026-10-17.bin' }
     };
     const rr = rmap[range];
-    const ranges = [['all', 'Весь flash'], ['b1', 'Банк 1'], ['b2', 'Банк 2'], ['custom', 'Диапазон']].map((x) => ({
-      label: x[1],
-      cls: x[0] === range ? 'on' : '',
-      pick: () => this.setState({ range: x[0] })
-    }));
+    const seg = (items, cur, key) => items.map((x) => ({ label: x[1], cls: x[0] === cur ? 'on' : '', pick: () => this.setState({ [key]: x[0] }) }));
+    const ranges = seg([['all', L ? 'Entire flash' : 'Весь flash'], ['b1', t.bank1], ['b2', t.bank2], ['custom', L ? 'Range' : 'Диапазон']], range, 'range');
     const rp = running && scr === 'readProgress' ? st.pct : 61;
+    const rLeft = Math.max(0, Math.round((100 - rp) / 100 * 14));
 
     const sectors = [];
     for (let i = 0; i < 16; i++) sectors.push({ cls: i < 2 ? 'sec erase' : 'sec' });
 
+    // settings
+    const langs = [['sys', t.sys], ['ru', 'Русский'], ['en', 'English']].map((x) => ({
+      label: x[1],
+      cls: (st.langPick || 'sys') === x[0] ? 'on' : '',
+      pick: () => this.setState({ langPick: x[0], lang: x[0] === 'sys' ? undefined : x[0] })
+    }));
+    const themes = seg([['system', t.sysTheme], ['light', t.light], ['dark', t.darkT]], theme, 'theme');
+    const swd = st.swd || '1800';
+    const swdLabel = { '4000': t.f4000, '1800': t.f1800, '950': t.f950, '480': t.f480 }[swd];
+    const tog = (key, def) => () => this.setState({ [key]: !(st[key] ?? def) });
+
+    // log
+    const verbose = st.verbose ?? false;
+    const lf = st.logFilter || 'all';
+    const logFilters = seg([['all', t.fAll], ['err', t.fErr], ['usb', t.fUsb]], lf, 'logFilter');
+    const rows = LOG.filter((r) => {
+      if (lf === 'err') return r[1] === 'WARN' || r[1] === 'ERROR';
+      if (lf === 'usb') return r[1] === 'TRACE';
+      return r[1] !== 'TRACE' || verbose;
+    }).map((r) => ({ ts: r[0], lvl: r[1], msg: r[2], lvlCls: 'lvl ' + r[1], rowCls: r[1] === 'ERROR' ? 'logrow err' : 'logrow' }));
+
+    const isArmed = st.auto ?? !!p.auto;
+    const isWatch = st.watch ?? !!p.watch;
+
     return {
-      themeClass: p.dark ? 'dark' : '',
+      t: t,
+      themeClass: isDark ? 'dark' : '',
       s1: cls(1), s2: cls(2), s3: cls(3),
       isEmpty: scr === 'empty',
-      isDevice: scr === 'device',
+      isReleased: scr === 'released',
+      isDeviceBase: scr === 'device' || scr === 'eraseConfirm',
+      isEraseConfirm: scr === 'eraseConfirm',
       isWriteForm: scr === 'write' || scr === 'confirm',
       isConfirm: scr === 'confirm',
-      isWriteProgress: scr === 'writeProgress',
+      isProgress: scr === 'writeProgress' || scr === 'eraseProgress',
       isWriteDone: scr === 'writeDone',
+      isEraseDone: scr === 'eraseDone',
       isRead: scr === 'read',
       isReadProgress: scr === 'readProgress',
       isReadDone: scr === 'readDone',
+      isSettings: overlay === 'settings',
+      isLog: overlay === 'log',
+      logBtnCls: overlay === 'log' ? 'icon-btn on' : 'icon-btn',
+      setBtnCls: overlay === 'settings' ? 'icon-btn on' : 'icon-btn',
+      openLog: () => this.setState({ overlay: 'log' }),
+      openSettings: () => this.setState({ overlay: 'settings' }),
+      closeOverlay: () => this.setState({ overlay: null }),
       toDevice: () => this.go('device'),
       toWrite: () => this.go('write'),
       toRead: () => this.go('read'),
       toConfirm: () => this.go('confirm'),
+      toEraseConfirm: () => this.go('eraseConfirm'),
+      release: () => this.go('released'),
+      connect: () => this.go('device'),
       startWrite: () => this.startWrite(),
+      startErase: () => this.startErase(),
       startRead: () => this.startRead(),
+      cancelProgress: () => this.go(isErase ? 'device' : 'write'),
       noop: () => {},
-      isArmed: st.auto ?? !!p.auto,
-      toggleAuto: () => this.setState({ auto: !(st.auto ?? !!p.auto) }),
+      isArmed: isArmed,
+      toggleAuto: () => this.setState({ auto: !isArmed }),
+      isWatch: isWatch,
+      toggleWatch: () => this.setState({ watch: !isWatch }),
+      quickChip: isWatch ? t.watching : t.changedAgo,
       quickWrite: () => this.startWrite(),
-      isWatch: st.watch ?? !!p.watch,
-      toggleWatch: () => this.setState({ watch: !(st.watch ?? !!p.watch) }),
-      quickChip: (st.watch ?? !!p.watch) ? 'слежу за файлом' : 'изменён 2 мин назад',
       addr: st.addr ?? '0x08000000',
       setAddr: (e) => this.setState({ addr: e.target.value }),
       verify: st.verify ?? true,
       resetAfter: st.resetAfter ?? true,
-      toggleVerify: () => this.setState({ verify: !(st.verify ?? true) }),
-      toggleReset: () => this.setState({ resetAfter: !(st.resetAfter ?? true) }),
+      toggleVerify: tog('verify', true),
+      toggleReset: tog('resetAfter', true),
+      alwaysConfirm: st.alwaysConfirm ?? false,
+      toggleConfirm: tog('alwaysConfirm', false),
+      autoConnect: st.autoConnect ?? true,
+      toggleAutoConnect: tog('autoConnect', true),
+      underReset: st.underReset ?? false,
+      toggleUnderReset: tog('underReset', false),
+      keepDebug: st.keepDebug ?? false,
+      toggleKeepDebug: tog('keepDebug', false),
+      verbose: verbose,
+      toggleVerbose: tog('verbose', false),
+      swd: swd,
+      swdLabel: swdLabel,
+      setSwd: (e) => this.setState({ swd: e.target.value }),
+      langs: langs,
+      themes: themes,
+      logFilters: logFilters,
+      logRows: rows,
+      logCount: rows.length + (L ? ' entries' : ' записей'),
       sectors: sectors,
       stages: stages,
-      wTotalPct: Math.round(total) + '%',
-      wLeft: fmt(left, 1) + ' с',
+      progTitle: isErase ? t.erasing : t.writing,
+      progSub: 'STM32H743 · ' + (isErase ? '0x08000000–0x081FFFFF' : '0x08000000') + ' · ' + leftStr,
+      barCls: isErase ? 'bar danger' : 'bar',
+      totalPct: Math.round(total) + '%',
       ranges: ranges,
       rStart: rr.start,
       rSize: rr.size,
@@ -569,8 +959,8 @@ class Component extends DCLogic {
       rEstimate: rr.est,
       rFile: rr.file,
       rPct: Math.round(rp) + '%',
-      rDone: fmt(2 * rp / 100, 2) + ' из 2,00 МБ',
-      rLeft: Math.max(0, Math.round((100 - rp) / 100 * 14)) + ' с'
+      rDone: num(2 * rp / 100, 2) + (L ? ' of 2.00 MB' : ' из 2,00 МБ'),
+      rSpeed: L ? '148 KB/s · ' + rLeft + ' s left' : '148 КБ/с · осталось ' + rLeft + ' ' + sec
     };
   }
 }

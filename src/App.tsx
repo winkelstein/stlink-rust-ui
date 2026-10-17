@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { isTauri } from "./backend";
+import { MockBackend } from "./backend/mock/MockBackend";
+import { DevPanel } from "./dev/DevPanel";
 import { WindowChrome } from "./components/WindowChrome";
-import { stepOf } from "./state/machine";
+import { isBusy, stepOf } from "./state/machine";
 import type { Controller } from "./state/controller";
 import { useAppState } from "./state/store";
 import { useDarkMode } from "./useDarkMode";
@@ -21,10 +23,62 @@ export default function App({ ctl }: { ctl: Controller }) {
   const dark = useDarkMode();
   const native = useMemo(isTauri, []);
   const ctx: AppCtx = { s, ctl, quickKey: IS_MAC ? "⌘R" : "Ctrl+R" };
+  const mock = ctl.backend instanceof MockBackend ? ctl.backend : null;
+  const [devOpen, setDevOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = IS_MAC ? e.metaKey : e.ctrlKey;
+      // ⌥⌘D: dev panel (mock only). `code`, since ⌥ changes `key`.
+      if (mod && e.altKey && e.code === "KeyD") {
+        if (mock) {
+          e.preventDefault();
+          setDevOpen((v) => !v);
+        }
+        return;
+      }
+      // ⌘R: quick write. Always swallowed so the webview never reloads.
+      if (mod && !e.altKey && !e.shiftKey && e.code === "KeyR") {
+        e.preventDefault();
+        if (!e.repeat) void ctl.quickWrite("quick");
+        return;
+      }
+      if (e.key === "Escape") {
+        const st = ctl.store.getState();
+        if (st.stub) ctl.store.dispatch({ type: "stubClosed" });
+        else if (st.screen === "confirm") ctl.cancelConfirm();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ctl, mock]);
+
+  // Drag-and-drop of a .bin onto the window (browser; Tauri delivers paths via its own events).
+  const canDrop = !!s.session?.target.geometry && !isBusy(s) && ["device", "write", "writeDone"].includes(s.screen);
+  const onDragOver = (e: DragEvent) => {
+    if (!canDrop || !e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+  const onDrop = (e: DragEvent) => {
+    if (!canDrop) return;
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(".bin")) {
+      ctl.store.dispatch({
+        type: "operationRejected",
+        context: "write",
+        error: { kind: "Unsupported", message: `«${f.name}»: поддерживаются только файлы .bin` },
+      });
+      return;
+    }
+    void ctl.dropFile(f).then(() => ctl.store.dispatch({ type: "navigate", to: "write" }));
+  };
 
   return (
     <Ctx.Provider value={ctx}>
-      <div className={native ? undefined : "stage-page"}>
+      <div className={native ? undefined : "stage-page"} onDragOver={onDragOver} onDrop={onDrop}>
         <WindowChrome
           dark={dark}
           native={native}
@@ -34,6 +88,7 @@ export default function App({ ctl }: { ctl: Controller }) {
         >
           <Screen />
           {s.stub && <ComingSoon which={s.stub} onClose={() => ctl.store.dispatch({ type: "stubClosed" })} />}
+          {mock && devOpen && <DevPanel mock={mock} onClose={() => setDevOpen(false)} />}
         </WindowChrome>
       </div>
     </Ctx.Provider>

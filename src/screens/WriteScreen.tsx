@@ -24,6 +24,9 @@ export function WriteScreen() {
   const est = plan ? estimateWrite(plan, f.verify) : null;
   const canWrite = !!plan && !isBusy(s) && s.screen === "write";
   const dispatch = ctl.store.dispatch;
+  const fileInfo = file
+    ? `${fmtSize(file.size)} (${fmtInt(file.size)} байт) · изменён в ${fmtClock(file.modifiedAt)}`
+    : "Выберите .bin для записи";
 
   return (
     <div style={screenStyle}>
@@ -54,11 +57,10 @@ export function WriteScreen() {
                   {file ? file.name : "Файл не выбран"}
                 </div>
                 <div
+                  title={fileInfo}
                   style={{ fontSize: 12, color: "var(--text2)", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                 >
-                  {file
-                    ? `${fmtSize(file.size)} (${fmtInt(file.size)} байт) · изменён в ${fmtClock(file.modifiedAt)}`
-                    : "Выберите .bin для записи"}
+                  {fileInfo}
                 </div>
               </div>
               <Button onClick={() => void ctl.pickFile()} disabled={isBusy(s)}>

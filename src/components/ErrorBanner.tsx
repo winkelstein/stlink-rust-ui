@@ -23,6 +23,13 @@ interface Props {
 // follows the «Автозапись включена» card on the empty screen.
 export function ErrorBanner({ banner, onAction, onDismiss, actionsDisabled }: Props) {
   const notice = banner.kind === "notice";
+  // Two hints do not fit next to the text: put them under it.
+  const stacked = banner.actions.length > 1;
+  const buttons = banner.actions.map((a) => (
+    <Button key={a} style={{ height: 26 }} disabled={actionsDisabled} onClick={() => onAction(a)}>
+      {LABELS[a]}
+    </Button>
+  ));
   return (
     <div
       className="card"
@@ -30,7 +37,7 @@ export function ErrorBanner({ banner, onAction, onDismiss, actionsDisabled }: Pr
       style={{
         padding: "10px 10px 10px 14px",
         display: "flex",
-        alignItems: "center",
+        alignItems: stacked ? "flex-start" : "center",
         gap: 12,
         fontSize: 12.5,
         boxShadow: notice ? "var(--shadow)" : "var(--shadow), inset 0 0 0 1px var(--warnFill)",
@@ -52,12 +59,9 @@ export function ErrorBanner({ banner, onAction, onDismiss, actionsDisabled }: Pr
       </span>
       <span style={{ flex: 1, lineHeight: 1.45, userSelect: "text" }}>
         <b>{banner.title}.</b> {banner.text}
+        {stacked && <span style={{ display: "flex", gap: 8, marginTop: 8 }}>{buttons}</span>}
       </span>
-      {banner.actions.map((a) => (
-        <Button key={a} style={{ height: 26 }} disabled={actionsDisabled} onClick={() => onAction(a)}>
-          {LABELS[a]}
-        </Button>
-      ))}
+      {!stacked && buttons}
       <button className="icon-btn" style={{ width: 26, height: 26 }} aria-label="Скрыть" onClick={onDismiss}>
         <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
           <path d="m1.5 1.5 7 7M8.5 1.5l-7 7" />

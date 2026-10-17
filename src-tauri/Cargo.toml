@@ -3,7 +3,8 @@ name = "stlink-rust-ui"
 description = "Desktop GUI for STM32 flashing over ST-Link"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+# Tauri 2.12 needs Rust 1.90 (the library and CLI keep the workspace 1.85).
+rust-version = "1.90"
 license.workspace = true
 
 [lib]

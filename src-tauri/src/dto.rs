@@ -217,9 +217,8 @@ fn rdp_name(l: RdpLevel) -> &'static str {
 
 /// UID as 24 hex digits: three 32-bit words, each printed big-endian (as `stlink-cli probe`).
 pub fn uid_hex(uid: &[u8; 12]) -> String {
-    uid.chunks_exact(4)
-        .map(|w| format!("{:08X}", u32::from_le_bytes([w[0], w[1], w[2], w[3]])))
-        .collect()
+    let word = |i: usize| u32::from_le_bytes([uid[i], uid[i + 1], uid[i + 2], uid[i + 3]]);
+    format!("{:08X}{:08X}{:08X}", word(0), word(4), word(8))
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -123,8 +123,12 @@ export interface AppState {
   /** Set after «Подключиться»; `null` while disconnected. */
   session: DeviceSession | null;
   connecting: boolean;
-  /** `Busy` from the last connect attempt: the «занят другой программой» variant of `released`. */
-  busy: boolean;
+  /**
+   * Why the last connect could not open the probe, shown as a variant of
+   * `released`: `busy` — another program has it; `driver` — Windows, not on
+   * WinUSB (`message` names the driver).
+   */
+  blocked: { reason: "busy" | "driver"; message: string } | null;
   settings: AppSettings;
   resetting: boolean;
   writeForm: WriteForm;
@@ -148,7 +152,7 @@ export const initialState: AppState = {
   probe: null,
   session: null,
   connecting: false,
-  busy: false,
+  blocked: null,
   settings: DEFAULT_SETTINGS,
   resetting: false,
   writeForm: { file: null, addrText: fmtHex32(0x0800_0000) },
@@ -234,6 +238,7 @@ function errorBanner(e: BackendError, context: BannerContext): Banner {
       return { ...base, actions: ["connectUnderReset", "keepDebugLowPower"] };
     case "FlashProtected":
     case "Unsupported":
+    case "DriverMissing":
       return { ...base, actions: [] };
     case "Cancelled":
       return { ...base, kind: "notice", actions: [] };
@@ -270,7 +275,7 @@ export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
     case "probeConnected":
       if (s.probe) return s;
-      return { ...closed(s), probe: a.probe, screen: "released", busy: false, banner: keepOpBanner(s.banner) };
+      return { ...closed(s), probe: a.probe, screen: "released", blocked: null, banner: keepOpBanner(s.banner) };
 
     case "probeDisconnected": {
       if (!s.probe || s.probe.id !== a.probeId) return s;
@@ -278,12 +283,12 @@ export function reducer(s: AppState, a: Action): AppState {
       const lost: BackendError = { kind: "Disconnected", message: "device disconnected" };
       if (s.op) banner = errorBanner(lost, s.op.kind);
       else if (banner && banner.kind !== "Disconnected") banner = null;
-      return { ...closed(s), screen: "empty", probe: null, busy: false, banner };
+      return { ...closed(s), screen: "empty", probe: null, blocked: null, banner };
     }
 
     case "connectStarted":
       if (!s.probe || isBusy(s)) return s;
-      return { ...s, connecting: true, busy: false, banner: keepOpBanner(s.banner) };
+      return { ...s, connecting: true, blocked: null, banner: keepOpBanner(s.banner) };
 
     case "connected": {
       if (!s.probe) return s;
@@ -297,12 +302,15 @@ export function reducer(s: AppState, a: Action): AppState {
 
     case "connectFailed":
       if (!s.probe) return s;
-      if (a.error.kind === "Busy") return { ...closed(s), screen: "released", busy: true, banner: null };
-      return { ...closed(s), screen: "released", busy: false, banner: errorBanner(a.error, "connect") };
+      if (a.error.kind === "Busy" || a.error.kind === "DriverMissing") {
+        const reason = a.error.kind === "Busy" ? "busy" : "driver";
+        return { ...closed(s), screen: "released", blocked: { reason, message: a.error.message }, banner: null };
+      }
+      return { ...closed(s), screen: "released", blocked: null, banner: errorBanner(a.error, "connect") };
 
     case "released":
       if (!s.probe) return s;
-      return { ...closed(s), screen: "released", busy: false, banner: null };
+      return { ...closed(s), screen: "released", blocked: null, banner: null };
 
     case "navigate": {
       if (isBusy(s) || !s.session || s.screen === "confirm") return s;

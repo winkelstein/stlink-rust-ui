@@ -9,6 +9,8 @@ pub enum ErrorKind {
     CoreNotAccessible,
     FlashProtected,
     Busy,
+    /// Windows: the device is not on WinUSB.
+    DriverMissing,
     Unsupported,
     Cancelled,
     Other,
@@ -49,6 +51,7 @@ impl From<stlink::Error> for BackendError {
             E::CoreNotAccessible(_) => ErrorKind::CoreNotAccessible,
             E::FlashProtected => ErrorKind::FlashProtected,
             E::Busy => ErrorKind::Busy,
+            E::DriverMissing { .. } => ErrorKind::DriverMissing,
             E::Unsupported(_) => ErrorKind::Unsupported,
             E::Cancelled => ErrorKind::Cancelled,
             _ => ErrorKind::Other,
@@ -71,6 +74,12 @@ mod tests {
             ),
             (stlink::Error::FlashProtected, ErrorKind::FlashProtected),
             (stlink::Error::Busy, ErrorKind::Busy),
+            (
+                stlink::Error::DriverMissing {
+                    driver: "STLinkUSB".into(),
+                },
+                ErrorKind::DriverMissing,
+            ),
             (stlink::Error::Unsupported("x"), ErrorKind::Unsupported),
             (stlink::Error::Cancelled, ErrorKind::Cancelled),
             (stlink::Error::Timeout, ErrorKind::Other),

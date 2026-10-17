@@ -31,6 +31,8 @@ import { migrateQuick } from "../domain/quickWrite";
 interface InitData {
   downloadsDir: string;
   downloadsDisplay: string;
+  /** Native path separator (`\\` on Windows). */
+  pathSep: string;
   quickWrite: { uid: string; settings: Partial<QuickWriteSettings> & Record<string, unknown> }[];
   settings: unknown;
   logPath: string | null;
@@ -67,8 +69,8 @@ function lazyUnsub(subscribe: () => Promise<() => void>): Unsubscribe {
   };
 }
 
-function joinPath(dir: string, name: string): string {
-  return dir.endsWith("/") ? dir + name : `${dir}/${name}`;
+function joinPath(dir: string, name: string, sep: string): string {
+  return dir.endsWith(sep) ? dir + name : `${dir}${sep}${name}`;
 }
 
 export class TauriBackend implements Backend {
@@ -186,8 +188,12 @@ export class TauriBackend implements Backend {
     return {
       name: defaultName,
       dir: this.initData.downloadsDisplay,
-      path: joinPath(this.initData.downloadsDir, defaultName),
+      path: joinPath(this.initData.downloadsDir, defaultName, this.initData.pathSep),
     };
+  }
+
+  openDriverPage(url: string): Promise<void> {
+    return call("open_driver_page", { url });
   }
 
   revealInFinder(target: SaveTarget): Promise<void> {

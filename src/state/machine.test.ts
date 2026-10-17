@@ -69,9 +69,18 @@ describe("hot-plug and connection", () => {
   it("Busy on connect: released with the busy text, no banner", () => {
     const s = run(connected[0], connected[1], { type: "connectFailed", error: { kind: "Busy", message: "busy" } });
     expect(s.screen).toBe("released");
-    expect(s.busy).toBe(true);
+    expect(s.blocked?.reason).toBe("busy");
     expect(s.banner).toBeNull();
-    expect(reducer(s, { type: "connectStarted" }).busy).toBe(false);
+    expect(reducer(s, { type: "connectStarted" }).blocked).toBeNull();
+  });
+
+  it("Windows driver missing: released with the driver variant", () => {
+    const s = run(connected[0], connected[1], {
+      type: "connectFailed",
+      error: { kind: "DriverMissing", message: 'USB driver "STLinkUSB" cannot be used' },
+    });
+    expect(s.screen).toBe("released");
+    expect(s.blocked).toEqual({ reason: "driver", message: 'USB driver "STLinkUSB" cannot be used' });
   });
 
   it("disconnect during write: banner with retry, late results ignored", () => {

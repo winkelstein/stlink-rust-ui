@@ -9,7 +9,7 @@ import { ErrorBanner } from "../components/ErrorBanner";
 export interface AppCtx {
   s: AppState;
   ctl: Controller;
-  /** `⌘R` on macOS, `Ctrl+R` elsewhere. */
+  /** `⌘R` on macOS, `Ctrl+R` elsewhere (`platform.ts`). */
   quickKey: string;
 }
 

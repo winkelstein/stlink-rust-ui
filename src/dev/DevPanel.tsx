@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { Segmented } from "../components/Segmented";
 import type { Controller } from "../state/controller";
 import { useAppState } from "../state/store";
+import { shortcut } from "../platform";
 
 // Dev-only (mock) tooling: not translated.
 
@@ -29,7 +30,7 @@ const LANGS: { value: LangSetting; label: string }[] = [
   { value: "en", label: "EN" },
 ];
 
-/** Mock-only controls (⌥⌘D): hot-plug, file changes, injected errors, speed, language. */
+/** Mock-only controls (⌥⌘D / Ctrl+Alt+D): hot-plug, file changes, injected errors, speed, language. */
 export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Controller; onClose: () => void }) {
   const c = mock.controls;
   const st = useSyncExternalStore(c.subscribe, c.getState);
@@ -57,7 +58,7 @@ export function DevPanel({ mock, ctl, onClose }: { mock: MockBackend; ctl: Contr
     >
       <div style={{ ...row, justifyContent: "space-between" }}>
         <span className="eyebrow">Mock · dev</span>
-        <span style={{ color: "var(--text3)", fontSize: 11 }}>⌥⌘D — скрыть</span>
+        <span style={{ color: "var(--text3)", fontSize: 11 }}>{shortcut("D", true)} — скрыть</span>
         <button className="icon-btn" style={{ width: 22, height: 22 }} aria-label="Закрыть dev-панель" onClick={onClose}>
           ×
         </button>

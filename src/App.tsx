@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { isTauri } from "./backend";
+import { isMod, shortcut } from "./platform";
 import { MockBackend } from "./backend/mock/MockBackend";
 import { DevPanel } from "./dev/DevPanel";
 import { WindowChrome } from "./components/WindowChrome";
@@ -19,15 +20,13 @@ import { ReadDoneScreen, ReadProgressScreen, ReadScreen } from "./screens/ReadSc
 import { SettingsSheet } from "./screens/SettingsSheet";
 import { LogSheet } from "./screens/LogSheet";
 
-export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-
 export default function App({ ctl }: { ctl: Controller }) {
   const s = useAppState(ctl.store);
   const systemDark = useDarkMode();
   const dark = s.settings.theme === "system" ? systemDark : s.settings.theme === "dark";
   const lang = resolveLang(s.settings.lang);
   const native = useMemo(isTauri, []);
-  const ctx: AppCtx = { s, ctl, quickKey: IS_MAC ? "⌘R" : "Ctrl+R" };
+  const ctx: AppCtx = { s, ctl, quickKey: shortcut("R") };
   const mock = ctl.backend instanceof MockBackend ? ctl.backend : null;
   const [devOpen, setDevOpen] = useState(false);
 
@@ -37,8 +36,8 @@ export default function App({ ctl }: { ctl: Controller }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const mod = IS_MAC ? e.metaKey : e.ctrlKey;
-      // ⌥⌘D: dev panel (mock only). `code`, since ⌥ changes `key`.
+      const mod = isMod(e);
+      // ⌥⌘D / Ctrl+Alt+D: dev panel (mock only). `code`, since ⌥ changes `key`.
       if (mod && e.altKey && e.code === "KeyD") {
         if (mock) {
           e.preventDefault();
@@ -46,13 +45,13 @@ export default function App({ ctl }: { ctl: Controller }) {
         }
         return;
       }
-      // ⌘,: settings.
+      // ⌘, / Ctrl+,: settings.
       if (mod && !e.altKey && e.key === ",") {
         e.preventDefault();
         ctl.store.dispatch({ type: "overlayOpened", overlay: "settings" });
         return;
       }
-      // ⌘R: quick write. Always swallowed so the webview never reloads.
+      // ⌘R / Ctrl+R: quick write. Always swallowed so the webview never reloads.
       if (mod && !e.altKey && !e.shiftKey && e.code === "KeyR") {
         e.preventDefault();
         if (!e.repeat && !ctl.store.getState().overlay) void ctl.quickWrite("quick");
@@ -87,7 +86,7 @@ export default function App({ ctl }: { ctl: Controller }) {
       ctl.backend.watchFileDrops((paths) => {
         if (!canDropIn(ctl.store.getState())) return;
         const path = paths[0];
-        acceptDrop(ctl, path.split("/").pop() ?? path, path);
+        acceptDrop(ctl, path.split(/[\\/]/).pop() ?? path, path);
       }),
     [ctl],
   );

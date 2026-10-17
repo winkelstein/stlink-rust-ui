@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useT } from "../i18n";
+import { IS_MAC, shortcut } from "../platform";
 import { LogIcon, SettingsIcon } from "./Icons";
 
 interface Props {
@@ -13,8 +14,12 @@ interface Props {
   children: ReactNode;
 }
 
-/** `data-tauri-drag-region` does not apply to children, so every passive element gets it. */
-const drag = { "data-tauri-drag-region": "" } as const;
+/**
+ * macOS: our bar is the window's titlebar (overlay style), so it drags the
+ * window; `data-tauri-drag-region` does not apply to children, so every
+ * passive element gets it. Windows/Linux: a native frame above, no dragging.
+ */
+const drag = IS_MAC ? ({ "data-tauri-drag-region": "" } as const) : {};
 
 export function WindowChrome({ dark, native, step, overlay, onLog, onSettings, children }: Props) {
   const { t } = useT();
@@ -35,8 +40,10 @@ export function WindowChrome({ dark, native, step, overlay, onLog, onSettings, c
           borderBottom: "1px solid var(--sep)",
         }}
       >
+        {/* Same width on both sides keeps the stepper centred; on macOS the left
+            one sits under the traffic lights (drawn here only in the browser). */}
         <div {...drag} aria-hidden="true" style={{ display: "flex", gap: 8, width: 120 }}>
-          {!native && (
+          {!native && IS_MAC && (
             <>
               <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57" }} />
               <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#FEBC2E" }} />
@@ -69,7 +76,7 @@ export function WindowChrome({ dark, native, step, overlay, onLog, onSettings, c
           <button
             className={overlay === "settings" ? "icon-btn on" : "icon-btn"}
             aria-label={t.settings}
-            title={`${t.settings} (⌘,)`}
+            title={`${t.settings} (${shortcut(",")})`}
             onClick={onSettings}
           >
             <SettingsIcon />

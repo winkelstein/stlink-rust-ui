@@ -43,7 +43,12 @@ struct AppState {
 
 impl AppState {
     /// `~/Downloads` style path for the UI.
+    /// The path as the user knows it: `~/Downloads` on macOS and Linux, the
+    /// full native path (`C:\Users\…\Downloads`) on Windows.
     fn display_dir(&self, dir: &Path) -> String {
+        if cfg!(windows) {
+            return dir.display().to_string();
+        }
         match self.home.as_deref().and_then(|h| dir.strip_prefix(h).ok()) {
             Some(rest) if rest.as_os_str().is_empty() => "~".into(),
             Some(rest) => format!("~/{}", rest.display()),
@@ -78,6 +83,8 @@ struct QuickWriteEntry {
 struct InitData {
     downloads_dir: String,
     downloads_display: String,
+    /// Native path separator, for joining file names in the UI.
+    path_sep: String,
     quick_write: Vec<QuickWriteEntry>,
     settings: Value,
     log_path: Option<String>,
@@ -88,6 +95,7 @@ fn init(state: State<'_, AppState>) -> InitData {
     InitData {
         downloads_dir: state.downloads.to_string_lossy().into_owned(),
         downloads_display: state.display_dir(&state.downloads),
+        path_sep: std::path::MAIN_SEPARATOR.to_string(),
         quick_write: state
             .quick
             .all()
@@ -267,6 +275,23 @@ fn reveal_in_finder(app: AppHandle, path: String) -> Result<()> {
         .map_err(|e| BackendError::other(format!("cannot reveal {path}: {e}")))
 }
 
+/// Driver download pages linked from the «driver missing» screen; nothing
+/// else can be opened from the UI.
+const DRIVER_PAGES: [&str; 2] = [
+    "https://www.st.com/en/development-tools/stsw-link009.html",
+    "https://zadig.akeo.ie/",
+];
+
+#[tauri::command]
+fn open_driver_page(app: AppHandle, url: String) -> Result<()> {
+    if !DRIVER_PAGES.contains(&url.as_str()) {
+        return Err(BackendError::other("unknown link"));
+    }
+    app.opener()
+        .open_url(&url, None::<&str>)
+        .map_err(|e| BackendError::other(format!("cannot open {url}: {e}")))
+}
+
 #[tauri::command]
 fn watch_file(
     state: State<'_, AppState>,
@@ -394,6 +419,7 @@ pub fn run() {
             open_bin_file,
             pick_save_path,
             reveal_in_finder,
+            open_driver_page,
             watch_file,
             unwatch_file,
             save_quick_write,

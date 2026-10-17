@@ -215,6 +215,7 @@ export type BackendErrorKind =
   | "CoreNotAccessible"
   | "FlashProtected"
   | "Busy"
+  | "DriverMissing"
   | "Unsupported"
   | "Cancelled"
   | "Other";
@@ -223,6 +224,12 @@ export interface BackendError {
   kind: BackendErrorKind;
   message: string;
 }
+
+/** Driver pages linked from the «driver missing» screen (Windows). */
+export const DRIVER_PAGES = {
+  stlink: "https://www.st.com/en/development-tools/stsw-link009.html",
+  zadig: "https://zadig.akeo.ie/",
+} as const;
 
 /** The only error type backend promises reject with. */
 export class BackendFailure extends Error {

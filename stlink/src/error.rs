@@ -24,6 +24,11 @@ pub enum Error {
     #[error("USB device is busy (used by another program?)")]
     Busy,
 
+    /// Windows: the device is bound to a driver nusb cannot use (it needs
+    /// WinUSB): the ST-Link driver from ST, or WinUSB via Zadig for DFU.
+    #[error("USB driver \"{driver}\" cannot be used; the device needs the WinUSB driver")]
+    DriverMissing { driver: String },
+
     /// The device was unplugged during the operation.
     #[error("device disconnected")]
     Disconnected,
@@ -111,8 +116,15 @@ pub enum Error {
     Verify { addr: u32 },
 }
 
+/// Windows `ERROR_ACCESS_DENIED` / `ERROR_SHARING_VIOLATION`: WinUSB opens a
+/// device exclusively, so another program holding it shows up this way.
+const WIN_DEVICE_IN_USE: [u32; 2] = [5, 32];
+
 impl From<nusb::Error> for Error {
     fn from(err: nusb::Error) -> Self {
+        if cfg!(windows) && err.os_error().is_some_and(|c| WIN_DEVICE_IN_USE.contains(&c)) {
+            return Error::Busy;
+        }
         match err.kind() {
             nusb::ErrorKind::Disconnected => Error::Disconnected,
             nusb::ErrorKind::PermissionDenied => Error::AccessDenied,

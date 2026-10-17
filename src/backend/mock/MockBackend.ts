@@ -517,7 +517,8 @@ export class MockBackend implements Backend {
   }
 
   defaultSaveTarget(defaultName: string): SaveTarget {
-    return { name: defaultName, dir: "~/Downloads", path: null };
+    // The browser saves into its own download folder.
+    return { name: defaultName, dir: "Downloads", path: null };
   }
 
   async pickSavePath(defaultName: string): Promise<SaveTarget | null> {
@@ -525,6 +526,10 @@ export class MockBackend implements Backend {
     const name = window.prompt("File name", defaultName)?.trim();
     if (!name) return null;
     return this.defaultSaveTarget(name.endsWith(".bin") ? name : `${name}.bin`);
+  }
+
+  async openDriverPage(url: string): Promise<void> {
+    window.open(url, "_blank", "noopener");
   }
 
   async revealInFinder(target: SaveTarget): Promise<void> {

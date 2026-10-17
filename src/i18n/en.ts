@@ -28,6 +28,11 @@ export const en: Dict = {
   busyText: (model) =>
     `${model} is used by another program (VS Code, OpenOCD, st-flash, STM32CubeProgrammer). Close it or disconnect the programmer there, then press Retry.`,
   retry: "Retry",
+  driverTitle: "WinUSB driver needed",
+  driverText: (model) =>
+    `${model} is detected, but Windows bound it to a driver the app cannot use. Install the ST-Link driver from ST (STM32CubeProgrammer installs it too), reconnect the programmer and press Retry.`,
+  driverStLink: "ST-Link driver (STSW-LINK009)",
+  driverZadig: "WinUSB via Zadig (for DFU)",
 
   quick: "Quick flash",
   changedAgo: (ago) => `changed ${ago}`,
@@ -176,6 +181,8 @@ export const en: Dict = {
   sizeVal: (size, bytes) => `${size} · ${bytes} bytes`,
   time: "Time",
   finder: "Show in Finder",
+  finderWin: "Show in Explorer",
+  finderLinux: "Show in folder",
   done: "Done",
 
   general: "General",
@@ -224,6 +231,8 @@ export const en: Dict = {
   errProtectedText: "Read protection (RDP) is on. The app cannot remove it — use STM32CubeProgrammer.",
   errBusy: "Programmer is busy",
   errBusyText: "The ST-Link is used by another program (OpenOCD, st-util, STM32CubeProgrammer). Close it and retry.",
+  errDriver: "WinUSB driver needed",
+  errDriverText: "Install the ST-Link driver from ST and reconnect the programmer.",
   errUnsupported: "Not supported",
   errUnsupportedText: "This operation is not supported for this programmer or MCU.",
   errOther: "Error",

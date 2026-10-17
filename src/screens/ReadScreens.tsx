@@ -9,6 +9,7 @@ import { fmtHex32, fmtRange } from "../domain/format";
 import { checkReadRange, fmtMax, parseNumber, readCheckText } from "../domain/validate";
 import { readableFlash } from "../domain/geometry";
 import { useT, type Dict } from "../i18n";
+import { PLATFORM } from "../platform";
 import { isBusy, type ReadRange } from "../state/machine";
 import { availableRanges } from "../state/readRange";
 import { DoneMark } from "./WriteDoneScreen";
@@ -199,7 +200,9 @@ export function ReadDoneScreen() {
       <Footer>
         <DeviceChip />
         <Spacer />
-        <Button onClick={() => void ctl.reveal()}>{t.finder}</Button>
+        <Button onClick={() => void ctl.reveal()}>
+          {PLATFORM === "macos" ? t.finder : PLATFORM === "windows" ? t.finderWin : t.finderLinux}
+        </Button>
         <Button primary onClick={() => ctl.store.dispatch({ type: "navigate", to: "device" })}>
           {t.done}
         </Button>

@@ -3,9 +3,9 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::UNIX_EPOCH;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, UNIX_EPOCH};
 
 use notify::{RecursiveMode, Watcher};
 use tracing::{debug, warn};
@@ -69,6 +69,33 @@ pub fn bin_file(path: impl AsRef<Path>) -> Result<BinFile> {
     })
 }
 
+/// A changed file that could not be read yet is read again after this delay.
+const RETRY_AFTER: Duration = Duration::from_millis(300);
+
+/// Reads the watched file and reports new metadata (deduplicated).
+struct Reporter {
+    path: PathBuf,
+    last: Mutex<Option<BinFile>>,
+    on_change: Box<dyn Fn(BinFile) + Send + Sync>,
+}
+
+impl Reporter {
+    /// `false` if the file cannot be read right now (missing, locked, mid-write).
+    fn check(&self) -> bool {
+        let Ok(meta) = bin_file(&self.path) else {
+            return false;
+        };
+        let mut last = self.last.lock().unwrap_or_else(|e| e.into_inner());
+        if last.as_ref() != Some(&meta) {
+            debug!("{} changed: {} bytes, CRC 0x{:08X}", meta.name, meta.size, meta.crc32);
+            *last = Some(meta.clone());
+            drop(last);
+            (self.on_change)(meta);
+        }
+        true
+    }
+}
+
 /// Active file watchers by id.
 #[derive(Default)]
 pub struct FileWatchers {
@@ -78,19 +105,21 @@ pub struct FileWatchers {
 
 impl FileWatchers {
     /// Watch `path` for changes; `on_change` gets the new metadata. The parent
-    /// directory is watched since build tools often replace the file (rename).
-    pub fn watch(
-        &self,
-        path: PathBuf,
-        on_change: impl Fn(BinFile) + Send + 'static,
-    ) -> Result<u64> {
+    /// directory is watched since build tools often replace the file (write a
+    /// temporary file, then rename). While the file is being written it may be
+    /// missing or locked (Windows: sharing violation): then it is read again
+    /// once a moment later, so the final state is not lost.
+    pub fn watch(&self, path: PathBuf, on_change: impl Fn(BinFile) + Send + Sync + 'static) -> Result<u64> {
         let dir = path
             .parent()
             .map(Path::to_path_buf)
             .ok_or_else(|| BackendError::other("invalid file path"))?;
         let name = path.file_name().map(|n| n.to_os_string());
-        let mut last: Option<BinFile> = None;
-        let watched = path.clone();
+        let report = Arc::new(Reporter {
+            path: path.clone(),
+            last: Mutex::new(None),
+            on_change: Box::new(on_change),
+        });
         let mut watcher = notify::recommended_watcher(move |ev: notify::Result<notify::Event>| {
             let ev = match ev {
                 Ok(ev) => ev,
@@ -99,17 +128,12 @@ impl FileWatchers {
             if !ev.paths.iter().any(|p| p.file_name() == name.as_deref()) {
                 return;
             }
-            // Mid-write the file may be missing or short; the next event follows.
-            let Ok(meta) = bin_file(&watched) else {
-                return;
-            };
-            if last.as_ref() != Some(&meta) {
-                debug!(
-                    "{} changed: {} bytes, CRC 0x{:08X}",
-                    meta.name, meta.size, meta.crc32
-                );
-                last = Some(meta.clone());
-                on_change(meta);
+            if !report.check() {
+                let report = report.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(RETRY_AFTER);
+                    report.check();
+                });
             }
         })
         .map_err(|e| BackendError::other(format!("cannot watch {}: {e}", path.display())))?;
@@ -147,6 +171,36 @@ mod tests {
         let p = temp("fw.bin", b"123456789")?;
         let f = bin_file(&p);
         assert!(matches!(&f, Ok(f) if f.size == 9 && f.crc32 == 0xCBF4_3926 && f.name == "fw.bin"));
+        Ok(())
+    }
+
+    /// Build tools write a temporary file and rename it over the watched one.
+    #[test]
+    fn watch_sees_rename_over_the_file() -> std::io::Result<()> {
+        let p = temp("watched.bin", b"old")?;
+        let watchers = FileWatchers::default();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let id = watchers.watch(p.clone(), move |f| {
+            let _ = tx.send(f);
+        });
+        assert!(id.is_ok());
+        // Let the watcher start (FSEvents has a short latency).
+        std::thread::sleep(Duration::from_millis(500));
+        let tmp = p.with_extension("bin.tmp");
+        std::fs::write(&tmp, b"123456789")?;
+        std::fs::rename(&tmp, &p)?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut seen = None;
+        while std::time::Instant::now() < deadline {
+            match rx.recv_timeout(Duration::from_millis(200)) {
+                Ok(f) if f.crc32 == 0xCBF4_3926 => {
+                    seen = Some(f);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(matches!(seen, Some(f) if f.size == 9), "no change event after rename");
         Ok(())
     }
 

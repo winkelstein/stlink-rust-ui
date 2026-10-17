@@ -25,10 +25,46 @@ pub(crate) struct Transport {
     _interface: Interface,
 }
 
+/// Whether a Windows device driver can be opened by nusb: WinUSB directly, or
+/// the composite parent `usbccgp` (V2-1/V3; nusb then checks the interface).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn driver_is_usable(driver: Option<&str>) -> bool {
+    driver.is_some_and(|d| d.eq_ignore_ascii_case("winusb") || d.eq_ignore_ascii_case("usbccgp"))
+}
+
+/// Windows: refuse early, with a clear error, when the device is not on WinUSB.
+#[cfg(windows)]
+fn check_windows_driver(desc: &ProbeDescriptor) -> Result<()> {
+    let driver = desc.info.driver();
+    if driver_is_usable(driver) {
+        return Ok(());
+    }
+    debug!(?driver, "device driver is not WinUSB");
+    Err(Error::DriverMissing {
+        driver: driver.unwrap_or("none").to_owned(),
+    })
+}
+
+/// nusb reports a non-WinUSB interface driver (composite devices) as `Unsupported`.
+fn open_error(desc: &ProbeDescriptor, e: nusb::Error) -> Error {
+    if cfg!(windows) && e.kind() == nusb::ErrorKind::Unsupported {
+        debug!("cannot open {}: {e}", desc.serial);
+        return Error::DriverMissing {
+            driver: e.to_string(),
+        };
+    }
+    e.into()
+}
+
 impl Transport {
     pub(crate) fn open(desc: &ProbeDescriptor, timeout: Duration) -> Result<Self> {
-        let device = desc.info.open().wait()?;
-        let interface = device.claim_interface(0).wait()?;
+        #[cfg(windows)]
+        check_windows_driver(desc)?;
+        let device = desc.info.open().wait().map_err(|e| open_error(desc, e))?;
+        let interface = device
+            .claim_interface(0)
+            .wait()
+            .map_err(|e| open_error(desc, e))?;
         let out = interface.endpoint::<Bulk, Out>(desc.ep_out)?;
         let inp = interface.endpoint::<Bulk, In>(desc.ep_in)?;
         Ok(Self {
@@ -162,6 +198,16 @@ mod tests {
     fn hex_short() {
         assert_eq!(hex(&[0xf1, 0x80, 0x00]), "f1 80 00");
         assert_eq!(hex(&[]), "");
+    }
+
+    #[test]
+    fn winusb_and_composite_parent_are_usable() {
+        assert!(driver_is_usable(Some("WinUSB")));
+        assert!(driver_is_usable(Some("winusb")));
+        assert!(driver_is_usable(Some("usbccgp")));
+        assert!(!driver_is_usable(Some("STLinkUSB")));
+        assert!(!driver_is_usable(Some("libusb0")));
+        assert!(!driver_is_usable(None));
     }
 
     #[test]

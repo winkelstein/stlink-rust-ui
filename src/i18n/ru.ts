@@ -33,6 +33,11 @@ export const ru = {
   busyText: (model: string) =>
     `${model} занят другой программой (VS Code, OpenOCD, st-flash, STM32CubeProgrammer). Закройте её или отключите в ней программатор и нажмите «Повторить».`,
   retry: "Повторить",
+  driverTitle: "Нужен драйвер WinUSB",
+  driverText: (model: string) =>
+    `${model} найден, но Windows подключила его через драйвер, с которым приложение не работает. Установите драйвер ST-Link от ST (он ставится и вместе со STM32CubeProgrammer), переподключите программатор и нажмите «Повторить».`,
+  driverStLink: "Драйвер ST-Link (STSW-LINK009)",
+  driverZadig: "WinUSB через Zadig (для DFU)",
 
   // device
   quick: "Быстрая запись",
@@ -195,6 +200,8 @@ export const ru = {
   sizeVal: (size: string, bytes: string) => `${size} · ${bytes} байт`,
   time: "Время",
   finder: "Показать в Finder",
+  finderWin: "Показать в проводнике",
+  finderLinux: "Показать в папке",
   done: "Готово",
 
   // settings
@@ -247,6 +254,8 @@ export const ru = {
   errProtectedText: "Включена защита чтения (RDP). Снять её из приложения нельзя — используйте STM32CubeProgrammer.",
   errBusy: "Программатор занят",
   errBusyText: "ST-Link используется другой программой (OpenOCD, st-util, STM32CubeProgrammer). Закройте её и повторите.",
+  errDriver: "Нужен драйвер WinUSB",
+  errDriverText: "Установите драйвер ST-Link от ST и переподключите программатор.",
   errUnsupported: "Не поддерживается",
   errUnsupportedText: "Эта операция не поддерживается для этого программатора или МК.",
   errOther: "Ошибка",

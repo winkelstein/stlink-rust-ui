@@ -69,6 +69,8 @@ export interface Backend {
   /** Default location for dumps (before the user picks one). */
   defaultSaveTarget(defaultName: string): SaveTarget;
   revealInFinder(target: SaveTarget): Promise<void>;
+  /** Open one of `DRIVER_PAGES` in the browser. */
+  openDriverPage(url: string): Promise<void>;
   /** Called with the new metadata (size, mtime, CRC) after each change. */
   watchFile(fileId: string, cb: (f: BinFile) => void): Unsubscribe;
 

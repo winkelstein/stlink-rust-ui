@@ -36,6 +36,8 @@ export function bannerText(t: Dict, b: Banner): { title: string; text: string } 
       return { title: t.errProtected, text: t.errProtectedText };
     case "Busy":
       return { title: t.errBusy, text: t.errBusyText };
+    case "DriverMissing":
+      return { title: t.errDriver, text: t.errDriverText };
     case "Unsupported":
       return { title: t.errUnsupported, text: t.errUnsupportedText };
     default: {

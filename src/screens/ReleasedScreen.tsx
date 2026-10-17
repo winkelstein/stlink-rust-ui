@@ -1,5 +1,5 @@
 import { Button } from "../components/Button";
-import { Footer, Spacer } from "../components/Footer";
+import { Footer } from "../components/Footer";
 import { ProbeOffIcon } from "../components/Icons";
 import { KeyValue } from "../components/KeyValue";
 import { probeModelName } from "../domain/chipNames";
@@ -82,8 +82,6 @@ export function ReleasedScreen() {
           <span className="led off" />
           {t.chipReleased(model)}
         </span>
-        <Spacer />
-        <span style={{ fontSize: 12, color: "var(--text2)" }}>{t.relFooter}</span>
       </Footer>
     </div>
   );

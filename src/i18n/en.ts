@@ -24,7 +24,6 @@ export const en: Dict = {
   connect: "Connect",
   connecting: "Connecting…",
   chipReleased: (model) => `${model} · disconnected`,
-  relFooter: "The app never connects to the programmer on its own",
   busyTitle: "Programmer is busy",
   busyText: (model) =>
     `${model} is used by another program (VS Code, OpenOCD, st-flash, STM32CubeProgrammer). Close it or disconnect the programmer there, then press Retry.`,

@@ -29,7 +29,6 @@ export const ru = {
   connect: "Подключиться",
   connecting: "Подключение…",
   chipReleased: (model: string) => `${model} · отключён`,
-  relFooter: "Приложение не подключается к программатору само",
   busyTitle: "Программатор занят",
   busyText: (model: string) =>
     `${model} занят другой программой (VS Code, OpenOCD, st-flash, STM32CubeProgrammer). Закройте её или отключите в ней программатор и нажмите «Повторить».`,

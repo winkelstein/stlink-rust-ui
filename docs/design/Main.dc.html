@@ -147,8 +147,6 @@ body{margin:0}
 </div>
 <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--bar); border-top: 1px solid var(--sep)">
 <span class="chip"><span class="led off"></span>{{t.chipReleased}}</span>
-<div style="flex: 1"></div>
-<span style="font-size: 12px; color: var(--text2)">{{t.relFooter}}</span>
 </div>
 </div>
 </sc-if>
@@ -620,7 +618,7 @@ const T = {
     relTitle: 'Программатор отключён',
     relText: 'ST-Link V2 найден. Нажмите «Подключиться», чтобы начать работу. Пока программатор отключён, им могут пользоваться VS Code, OpenOCD или st-flash.',
     connect: 'Подключиться',
-    chipReleased: 'ST-Link V2 · отключён', relFooter: 'Приложение не подключается к программатору само',
+    chipReleased: 'ST-Link V2 · отключён',
     quick: 'Быстрая запись', changedAgo: 'изменён 2 мин назад', watching: 'слежу за файлом',
     onConnect: 'При подключении платы', onChange: 'При изменении файла', flashBtn: 'Записать',
     programmer: 'Программатор', connected: 'Подключён', firmware: 'Прошивка', serial: 'Серийный номер',
@@ -676,7 +674,7 @@ const T = {
     relTitle: 'Programmer disconnected',
     relText: 'ST-Link V2 is detected. Press Connect to start. While it is disconnected, VS Code, OpenOCD or st-flash can use it.',
     connect: 'Connect',
-    chipReleased: 'ST-Link V2 · disconnected', relFooter: 'The app never connects to the programmer on its own',
+    chipReleased: 'ST-Link V2 · disconnected',
     quick: 'Quick flash', changedAgo: 'changed 2 min ago', watching: 'watching file',
     onConnect: 'When the board connects', onChange: 'When the file changes', flashBtn: 'Flash',
     programmer: 'Programmer', connected: 'Connected', firmware: 'Firmware', serial: 'Serial number',

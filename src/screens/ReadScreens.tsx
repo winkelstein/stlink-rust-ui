@@ -6,7 +6,8 @@ import { ProgressBar } from "../components/ProgressBar";
 import { Segmented } from "../components/Segmented";
 import { estimateRead, remainingSeconds, SPEED } from "../domain/estimate";
 import { fmtHex32, fmtRange } from "../domain/format";
-import { checkReadRange, parseNumber, readCheckText } from "../domain/validate";
+import { checkReadRange, fmtMax, parseNumber, readCheckText } from "../domain/validate";
+import { readableFlash } from "../domain/geometry";
 import { useT, type Dict } from "../i18n";
 import { isBusy, type ReadRange } from "../state/machine";
 import { availableRanges } from "../state/readRange";
@@ -24,7 +25,11 @@ export function ReadScreen() {
   const g = s.session?.target.geometry;
   const f = s.readForm;
   const locked = f.range !== "custom";
-  const check = checkReadRange(f.startText, f.sizeText);
+  const flash = s.session ? readableFlash(s.session.target) : null;
+  const check = checkReadRange(flash, f.startText, f.sizeText);
+  // Bytes from the start address to the end of flash, for the hint under «Размер».
+  const startCheck = checkReadRange(flash, f.startText, "");
+  const max = startCheck.ok ? startCheck.size : null;
   const name = f.target?.name ?? ctl.readName();
   const dir = f.target?.dir ?? ctl.backend.defaultSaveTarget(name).dir;
   const ranges = g ? availableRanges(g) : (["custom"] as ReadRange[]);
@@ -44,6 +49,8 @@ export function ReadScreen() {
         className={`field mono${!locked && !check.ok ? " invalid" : ""}`}
         value={shown(key)}
         disabled={locked}
+        placeholder={key === "sizeText" ? t.readToEnd : undefined}
+        aria-invalid={!locked && !check.ok}
         spellCheck={false}
         autoComplete="off"
         onChange={(e) => dispatch({ type: "readFieldChanged", field: key, text: e.currentTarget.value })}
@@ -70,8 +77,10 @@ export function ReadScreen() {
             {field("r-start", t.start, "startText")}
             {field("r-size", t.size, "sizeText")}
           </div>
-          {!locked && !check.ok && (
-            <div style={{ fontSize: 11.5, color: "var(--warn)", marginTop: -6 }}>{readCheckText(tr, check.error)}</div>
+          {!locked && (
+            <div style={{ fontSize: 11.5, color: check.ok ? "var(--text2)" : "var(--warn)", marginTop: -6 }}>
+              {check.ok ? (max !== null ? t.readMax(fmtMax(tr, max)) : null) : readCheckText(tr, check)}
+            </div>
           )}
         </section>
         <section className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>

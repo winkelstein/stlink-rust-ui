@@ -44,6 +44,17 @@ pub enum Error {
     #[error("invalid response from probe: {0}")]
     InvalidResponse(&'static str),
 
+    /// A flash read range (`addr`, `len` bytes) is not inside flash `[start, end)`.
+    #[error(
+        "range 0x{addr:08X}+0x{len:X} is outside flash (0x{start:08X}..0x{end:08X}); use `mem` for other memory"
+    )]
+    OutOfFlash {
+        addr: u32,
+        len: u64,
+        start: u32,
+        end: u64,
+    },
+
     /// The caller passed arguments the operation cannot handle.
     #[error("invalid argument: {0}")]
     InvalidArgument(&'static str),

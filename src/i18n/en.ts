@@ -117,7 +117,10 @@ export const en: Dict = {
   planDoesNotFit: (left, need) => `The file does not fit: ${left} left to the end of flash, ${need} needed`,
   readEnterStart: "Enter a start address: 0x08000000",
   readEnterSize: "Enter a size: 0x40000, 256K or 262144",
-  readOverflow: "The range goes past the end of the address space",
+  readTooBig: (max) => `At most ${max} from this address to the end of flash`,
+  readMax: (max) => `To the end of flash: ${max}`,
+  readToEnd: "to the end of flash",
+  readUnknown: "Flash size is unknown — reading is not available",
 
   cfTitle: (n) => `Erase ${sectors(n)} and flash the firmware?`,
   cf2: () => "will be erased. The rest of the memory stays unchanged.",

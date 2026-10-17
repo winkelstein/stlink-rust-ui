@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { H743_GEOMETRY as g, planWrite, sameSectors, sectorRuns } from "./geometry";
+import { H743_GEOMETRY as g, planWrite, readableFlash, sameSectors, sectorRuns } from "./geometry";
 import { crc32 } from "./crc32";
-import { parseNumber, writeAddrHint, checkReadRange } from "./validate";
+import { parseNumber, writeAddrHint, checkReadRange, readCheckText } from "./validate";
 import { estimateWrite, remainingSeconds, writeFraction } from "./estimate";
 import { fmtAgo, fmtFreq, fmtHex32, fmtInt, fmtRange, fmtSize, fmtUid, fmtVoltage, plural } from "./format";
 import { DEFAULT_QUICK, migrateQuick, needsConfirm, onFileChanged } from "./quickWrite";
@@ -9,6 +9,7 @@ import { normalizeSettings, DEFAULT_SETTINGS, type BinFile, type FlashPlan } fro
 import { dict, i18n, systemLang } from "../i18n/core";
 
 const ru = i18n("ru");
+const F = { base: g.base, size: g.size };
 const en = i18n("en");
 const SECTOR_FORMS = ["сектор", "сектора", "секторов"] as const;
 
@@ -120,10 +121,44 @@ describe("writeAddrHint", () => {
 
 describe("checkReadRange", () => {
   it("ok and errors", () => {
-    expect(checkReadRange("0x08000000", "0x40000")).toEqual({ ok: true, addr: 0x0800_0000, size: 0x40000 });
-    expect(checkReadRange("x", "1").ok).toBe(false);
-    expect(checkReadRange("0x08000000", "0").ok).toBe(false);
-    expect(checkReadRange("0xFFFFFFF0", "0x20").ok).toBe(false);
+    expect(checkReadRange(F, "0x08000000", "0x40000")).toEqual({ ok: true, addr: 0x0800_0000, size: 0x40000 });
+    expect(checkReadRange(F, "x", "1").ok).toBe(false);
+    expect(checkReadRange(F, "0x08000000", "0").ok).toBe(false);
+  });
+
+  it("ends exactly at the end of flash", () => {
+    expect(checkReadRange(F, "0x08000000", "0x200000")).toEqual({ ok: true, addr: 0x0800_0000, size: 0x20_0000 });
+    expect(checkReadRange(F, "0x081FFFFC", "4").ok).toBe(true);
+  });
+
+  it("one byte more is rejected with the maximum", () => {
+    const r = checkReadRange(F, "0x08000000", "0x200001");
+    expect(r).toMatchObject({ ok: false, error: "tooBig", max: 0x20_0000 });
+    if (!r.ok) expect(readCheckText(ru, r)).toBe("Не больше 0x200000 (2 МБ) от этого адреса до конца flash");
+  });
+
+  it("start in bank 2", () => {
+    expect(checkReadRange(F, "0x08100000", "1M").ok).toBe(true);
+    expect(checkReadRange(F, "0x08100000", "0x100001")).toMatchObject({ ok: false, error: "tooBig", max: 0x10_0000 });
+  });
+
+  it("address before or after flash", () => {
+    const before = checkReadRange(F, "0x07FFFFFC", "4");
+    expect(before).toMatchObject({ ok: false, error: "outside" });
+    if (!before.ok) expect(readCheckText(ru, before)).toBe("Адрес вне flash (0x08000000–0x081FFFFF)");
+    expect(checkReadRange(F, "0x08200000", "4")).toMatchObject({ ok: false, error: "outside" });
+    expect(checkReadRange(F, "0x20000000", "64")).toMatchObject({ ok: false, error: "outside" });
+  });
+
+  it("empty size reads to the end of flash; unknown flash cannot be read", () => {
+    expect(checkReadRange(F, "0x08180000", "")).toEqual({ ok: true, addr: 0x0818_0000, size: 0x8_0000 });
+    expect(checkReadRange(null, "0x08000000", "")).toMatchObject({ ok: false, error: "unknown" });
+  });
+
+  it("flash range without a flash driver comes from the flash size", () => {
+    expect(readableFlash({ geometry: null, flashSize: 1 << 20 })).toEqual({ base: 0x0800_0000, size: 1 << 20 });
+    expect(readableFlash({ geometry: null, flashSize: null })).toBeNull();
+    expect(readableFlash({ geometry: g, flashSize: null })).toEqual({ base: g.base, size: g.size });
   });
 });
 

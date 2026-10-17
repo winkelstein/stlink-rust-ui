@@ -105,3 +105,19 @@ export function sectorRuns(g: FlashGeometry, sectors: readonly Sector[]): Sector
   }
   return runs;
 }
+
+/** Main flash as an address range (what `flash::read_len` accepts). */
+export interface FlashRange {
+  base: number;
+  size: number;
+}
+
+/**
+ * Readable flash of a target: from the geometry when there is a flash driver,
+ * else from the flash size register (reading needs no driver). `null` when the
+ * size is unknown — the library refuses to dump then.
+ */
+export function readableFlash(t: { geometry: FlashGeometry | null; flashSize: number | null }): FlashRange | null {
+  if (t.geometry) return { base: t.geometry.base, size: t.geometry.size };
+  return t.flashSize ? { base: 0x0800_0000, size: t.flashSize } : null;
+}

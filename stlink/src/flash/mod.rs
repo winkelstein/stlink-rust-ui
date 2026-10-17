@@ -7,7 +7,7 @@ use std::ops::ControlFlow;
 
 use tracing::{debug, info, warn};
 
-use crate::chips::ChipDescriptor;
+use crate::chips::{self, ChipDescriptor};
 use crate::probe::StLink;
 use crate::target::TargetInfo;
 use crate::{Error, Result};
@@ -64,21 +64,27 @@ pub fn plan_write(target: &TargetInfo, addr: u32, len: usize) -> Result<WritePla
 }
 
 /// Bytes to read for a dump at `addr`: `size` if given, otherwise up to the
-/// end of flash (only when `addr` is inside flash).
+/// end of flash. The whole range must lie in flash (`OutOfFlash` otherwise);
+/// other memory is read with `read_memory`.
 pub fn read_len(target: &TargetInfo, addr: u32, size: Option<u32>) -> Result<usize> {
-    let len = match (size, target.flash_end()) {
-        (Some(size), _) => u64::from(size),
-        (None, Some(end)) if target.in_flash(addr) => end - u64::from(addr),
-        _ => {
-            return Err(Error::InvalidArgument(
-                "size is required outside the known flash range",
-            ));
-        }
+    let end = target.flash_end().ok_or(Error::Unsupported(
+        "flash read without a known flash size (use `mem`)",
+    ))?;
+    let len = match size {
+        Some(size) => u64::from(size),
+        None if target.in_flash(addr) => end - u64::from(addr),
+        None => 0,
     };
-    if u64::from(addr) + len > 1 << 32 {
-        return Err(Error::InvalidArgument(
-            "range past the end of address space",
-        ));
+    if !target.in_flash(addr) || u64::from(addr) + len > end {
+        return Err(Error::OutOfFlash {
+            addr,
+            len,
+            start: chips::FLASH_BASE,
+            end,
+        });
+    }
+    if len == 0 {
+        return Err(Error::InvalidArgument("nothing to read"));
     }
     usize::try_from(len).map_err(|_| Error::InvalidArgument("size too large"))
 }
@@ -126,8 +132,8 @@ impl RdpLevel {
 }
 
 impl StLink {
-    /// Dump memory (by default the whole flash, see [`read_len`]). Refuses to
-    /// read RDP-protected flash. Works with the core running.
+    /// Dump flash (by default all of it, see [`read_len`]; the range must lie
+    /// in flash). Refuses to read RDP-protected flash. Works with the core running.
     pub fn dump(
         &mut self,
         target: &TargetInfo,
@@ -136,17 +142,15 @@ impl StLink {
         on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<Vec<u8>> {
         let len = read_len(target, addr, size)?;
-        if let Some(chip) = target.chip
-            && target.in_flash(addr)
-        {
+        if let Some(chip) = target.chip {
             self.ensure_unprotected(chip)?;
         }
         self.read_flash(addr, len, on_progress)
     }
 
-    /// Read `len` bytes from `addr` in blocks, reporting progress.
-    /// Works with the core running (reads go through the AHB-AP).
-    pub fn read_flash(
+    /// Read `len` bytes from `addr` in blocks, reporting progress. Private:
+    /// the range is checked by [`StLink::dump`]. Works with the core running.
+    fn read_flash(
         &mut self,
         addr: u32,
         len: usize,
@@ -451,14 +455,49 @@ mod tests {
         let t = target(0x450, Some(2 * 1024 * 1024));
         assert_eq!(read_len(&t, 0x0800_0000, None).ok(), Some(2 * 1024 * 1024));
         assert_eq!(read_len(&t, 0x0810_0000, None).ok(), Some(1024 * 1024));
-        assert_eq!(read_len(&t, 0x2000_0000, Some(64)).ok(), Some(64));
-        assert!(
-            read_len(&t, 0x2000_0000, None).is_err(),
-            "outside flash needs size"
-        );
-        assert!(read_len(&t, 0xFFFF_FFF0, Some(32)).is_err(), "past 4 GiB");
         let unknown_size = target(0x450, None);
-        assert!(read_len(&unknown_size, 0x0800_0000, None).is_err());
+        assert!(matches!(
+            read_len(&unknown_size, 0x0800_0000, None),
+            Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn read_len_stays_in_flash() {
+        let t = target(0x450, Some(2 * 1024 * 1024));
+        let out = |r: Result<usize>| matches!(r, Err(Error::OutOfFlash { .. }));
+        // Exactly up to the end of flash.
+        assert_eq!(read_len(&t, 0x0800_0000, Some(0x20_0000)).ok(), Some(0x20_0000));
+        assert_eq!(read_len(&t, 0x081F_FFFC, Some(4)).ok(), Some(4));
+        // One byte more.
+        assert!(out(read_len(&t, 0x0800_0000, Some(0x20_0001))));
+        assert!(out(read_len(&t, 0x081F_FFFC, Some(5))));
+        // Inside bank 2.
+        assert_eq!(read_len(&t, 0x0810_0000, Some(0x10_0000)).ok(), Some(0x10_0000));
+        assert!(out(read_len(&t, 0x0810_0000, Some(0x10_0001))));
+        // Before and after flash, RAM, end of the address space.
+        assert!(out(read_len(&t, 0x07FF_FFFC, Some(4))));
+        assert!(out(read_len(&t, 0x0820_0000, None)));
+        assert!(out(read_len(&t, 0x2000_0000, Some(64))));
+        assert!(out(read_len(&t, 0xFFFF_FFF0, Some(32))));
+        assert!(matches!(
+            read_len(&t, 0x0800_0000, Some(0)),
+            Err(Error::InvalidArgument(_))
+        ));
+    }
+
+    #[test]
+    fn out_of_flash_message() {
+        let e = Error::OutOfFlash {
+            addr: 0x0800_0000,
+            len: 0x20_0001,
+            start: 0x0800_0000,
+            end: 0x0820_0000,
+        };
+        assert_eq!(
+            e.to_string(),
+            "range 0x08000000+0x200001 is outside flash (0x08000000..0x08200000); use `mem` for other memory"
+        );
     }
 
     #[test]

@@ -70,14 +70,16 @@ enum Command {
         #[arg(long, default_value_t = 0)]
         ap: u8,
     },
-    /// Read memory (by default the whole flash) into a .bin file.
+    /// Read flash (by default all of it) into a .bin file. The range must lie
+    /// in flash; use `mem` for other memory.
     Read {
         /// Output file.
         file: PathBuf,
         /// Start address.
         #[arg(long, value_parser = parse_u32, default_value = "0x08000000")]
         addr: u32,
-        /// Bytes to read; default: from `addr` to the end of flash.
+        /// Bytes to read; default: from `addr` to the end of flash. Must not
+        /// go past the end of flash.
         #[arg(long, value_parser = parse_u32)]
         size: Option<u32>,
     },

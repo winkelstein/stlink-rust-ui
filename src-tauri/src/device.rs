@@ -260,6 +260,8 @@ impl Worker {
         let started = Instant::now();
         let r = (|| {
             let target = self.link()?.identify()?;
+            // Checked here too, not only in the UI: the range must lie in flash.
+            flash::read_len(&target, job.addr, Some(job.size))?;
             let data = self.link()?.dump(&target, job.addr, Some(job.size), |p| {
                 on_progress(p.into());
                 check_cancel(cancel)

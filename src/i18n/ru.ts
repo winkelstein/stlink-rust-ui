@@ -130,7 +130,10 @@ export const ru = {
   planDoesNotFit: (left: string, need: string) => `Файл не помещается: до конца flash ${left}, нужно ${need}`,
   readEnterStart: "Введите начальный адрес: 0x08000000",
   readEnterSize: "Введите размер: 0x40000, 256K или 262144",
-  readOverflow: "Диапазон выходит за конец адресного пространства",
+  readTooBig: (max: string) => `Не больше ${max} от этого адреса до конца flash`,
+  readMax: (max: string) => `До конца flash: ${max}`,
+  readToEnd: "до конца flash",
+  readUnknown: "Размер flash неизвестен — чтение недоступно",
 
   // confirm
   cfTitle: (n: number) => `Стереть ${sectors(n)} и записать прошивку?`,

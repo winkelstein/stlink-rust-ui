@@ -5,6 +5,7 @@ import type { Backend, Unsubscribe } from "../backend/Backend";
 import { toBackendError, type BinFile, type ConnectOptions, type ProbeId } from "../backend/types";
 import { chipShortName } from "../domain/chipNames";
 import { parseNumber, checkReadRange } from "../domain/validate";
+import { readableFlash } from "../domain/geometry";
 import { DEFAULT_QUICK, FILE_CHANGE_DEBOUNCE_MS, needsConfirm, onFileChanged } from "../domain/quickWrite";
 import {
   connectOptions,
@@ -278,7 +279,7 @@ export class Controller {
     const s = this.s;
     const probe = this.probeId();
     if (!probe || isBusy(s) || s.screen !== "read") return;
-    const r = checkReadRange(s.readForm.startText, s.readForm.sizeText);
+    const r = checkReadRange(s.session ? readableFlash(s.session.target) : null, s.readForm.startText, s.readForm.sizeText);
     if (!r.ok) return;
     const target = s.readForm.target ?? this.backend.defaultSaveTarget(this.readName());
     const job = { addr: r.addr, size: r.size, target };

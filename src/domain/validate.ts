@@ -3,8 +3,8 @@
 
 import type { FlashGeometry } from "../backend/types";
 import type { I18n } from "../i18n/core";
-import { bankBase, bankOf, flashEnd, planWrite, sectorOf, type PlanError } from "./geometry";
-import { fmtHex32, fmtRange } from "./format";
+import { bankBase, bankOf, flashEnd, planWrite, sectorOf, type FlashRange, type PlanError } from "./geometry";
+import { fmtHex, fmtHex32, fmtRange } from "./format";
 
 /**
  * `0x08000000`, `134217728`, `256K`, `1M`, `0x4_0000`. Separators (`_`, spaces)
@@ -66,18 +66,48 @@ export function writeAddrHint(tr: I18n, g: FlashGeometry, text: string, len: num
   return { tone: "warn", text: t.addrUnaligned(where, fmtHex32(sector.addr)) };
 }
 
-export type ReadCheckError = "start" | "size" | "overflow";
-export type ReadCheck = { ok: true; addr: number; size: number } | { ok: false; error: ReadCheckError };
+export type ReadCheckError = "start" | "size" | "outside" | "tooBig" | "unknown";
+export type ReadCheck =
+  | { ok: true; addr: number; size: number }
+  | { ok: false; error: ReadCheckError; flash: FlashRange | null; max: number | null };
 
-export function checkReadRange(startText: string, sizeText: string): ReadCheck {
+/**
+ * A dump range must lie in flash (as `flash::read_len` in the library). An
+ * empty size means «up to the end of flash». `max` — bytes from a valid start
+ * address to the end of flash.
+ */
+export function checkReadRange(flash: FlashRange | null, startText: string, sizeText: string): ReadCheck {
+  const fail = (error: ReadCheckError, max: number | null = null): ReadCheck => ({ ok: false, error, flash, max });
+  if (!flash) return fail("unknown");
+  const end = flash.base + flash.size;
   const addr = parseNumber(startText);
-  if (addr === null) return { ok: false, error: "start" };
+  if (addr === null) return fail("start");
+  if (addr < flash.base || addr >= end) return fail("outside");
+  const max = end - addr;
+  if (sizeText.split("·")[0].trim() === "") return { ok: true, addr, size: max };
   const size = parseNumber(sizeText);
-  if (size === null || size === 0) return { ok: false, error: "size" };
-  if (addr + size > 2 ** 32) return { ok: false, error: "overflow" };
+  if (size === null || size === 0) return fail("size", max);
+  if (size > max) return fail("tooBig", max);
   return { ok: true, addr, size };
 }
 
-export function readCheckText({ t }: I18n, e: ReadCheckError): string {
-  return { start: t.readEnterStart, size: t.readEnterSize, overflow: t.readOverflow }[e];
+/** `0x40000 (256 КБ)`. */
+export function fmtMax({ f }: I18n, bytes: number): string {
+  return `${fmtHex(bytes)} (${f.size(bytes)})`;
+}
+
+export function readCheckText(tr: I18n, c: Extract<ReadCheck, { ok: false }>): string {
+  const { t } = tr;
+  switch (c.error) {
+    case "start":
+      return t.readEnterStart;
+    case "size":
+      return t.readEnterSize;
+    case "outside":
+      return c.flash ? t.planOutside(fmtRange(c.flash.base, c.flash.size)) : t.readUnknown;
+    case "tooBig":
+      return t.readTooBig(fmtMax(tr, c.max ?? 0));
+    case "unknown":
+      return t.readUnknown;
+  }
 }

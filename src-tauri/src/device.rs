@@ -12,8 +12,8 @@ use stlink::{ConnectOptions, Connection, ProbeDescriptor, StLink, TargetInfo};
 use tracing::{debug, info, warn};
 
 use crate::dto::{
-    self, ConnectionDto, DeviceSession, FlashPlan, ProbeInfo, ProbeVersionDto, ProgressDto,
-    ReadJob, ReadResult, StageMs, TargetInfoDto, WriteJob, WriteResult,
+    ConnectionDto, DeviceSession, EraseResult, FlashPlan, ProbeInfo, ProbeSummary,
+    ProgressDto, ReadJob, ReadResult, StageMs, TargetInfoDto, WriteJob, WriteResult,
 };
 use crate::error::{BackendError, ErrorKind, Result};
 use crate::files;
@@ -27,25 +27,20 @@ pub struct Actor {
 }
 
 impl Actor {
-    /// Open the probe (version, voltage) and start its worker. A probe that
-    /// cannot be opened (busy, access denied) still gets a worker: the next
-    /// `identify` retries and reports the error.
-    pub fn spawn(desc: ProbeDescriptor) -> std::io::Result<(Self, ProbeInfo)> {
+    /// Start the worker of a discovered probe. The probe is **not** opened:
+    /// the app touches it only after the user's `connect`.
+    pub fn spawn(desc: ProbeDescriptor) -> std::io::Result<Self> {
         let mut worker = Worker::new(desc);
-        if let Err(e) = worker.open() {
-            warn!("cannot open {}: {e}", worker.info.id);
-        }
-        let info = worker.info.clone();
         let (tx, rx) = mpsc::channel::<Job>();
         std::thread::Builder::new()
-            .name(format!("probe {}", info.id))
+            .name(format!("probe {}", worker.info.id))
             .spawn(move || {
                 while let Ok(job) = rx.recv() {
                     job(&mut worker);
                 }
                 debug!("probe {} worker stopped", worker.info.id);
             })?;
-        Ok((Self { tx }, info))
+        Ok(Self { tx })
     }
 
     /// Run `f` on the worker thread and wait for its result.
@@ -68,7 +63,8 @@ pub struct Worker {
     desc: ProbeDescriptor,
     info: ProbeInfo,
     link: Option<StLink>,
-    /// Options of the last successful `identify`; reused after a reopen.
+    /// Options of the user's `connect`; `None` while disconnected. Reused to
+    /// reopen after an error dropped the link, never without a `connect`.
     opts: Option<ConnectOptions>,
     /// The identified target (its UID notices a swapped board).
     target: Option<TargetInfo>,
@@ -76,10 +72,11 @@ pub struct Worker {
 
 impl Worker {
     fn new(desc: ProbeDescriptor) -> Self {
+        let summary = ProbeSummary::from(&desc);
         let info = ProbeInfo {
-            id: dto::probe_id(&desc),
-            descriptor: (&desc).into(),
-            version: ProbeVersionDto::unknown(),
+            id: summary.id,
+            descriptor: summary.descriptor,
+            version: None,
             target_voltage: None,
         };
         Self {
@@ -95,7 +92,7 @@ impl Worker {
     fn open(&mut self) -> stlink::Result<&mut StLink> {
         self.link = None;
         let mut link = StLink::open(&self.desc)?;
-        self.info.version = link.version().into();
+        self.info.version = Some(link.version().into());
         self.info.target_voltage = match link.target_voltage() {
             Ok(v) => v,
             Err(e) => {
@@ -152,12 +149,27 @@ impl Worker {
         r
     }
 
-    pub fn identify(&mut self, opts: ConnectOptions) -> Result<DeviceSession> {
-        let r = self.identify_inner(opts);
-        self.after(r)
+    /// The user's «Подключиться»: open, connect, identify. On failure the
+    /// probe is closed again (and stays closed).
+    pub fn connect_target(&mut self, opts: ConnectOptions) -> Result<DeviceSession> {
+        let r = self.connect_inner(opts);
+        if r.is_err() {
+            self.disconnect();
+        }
+        r
     }
 
-    fn identify_inner(&mut self, opts: ConnectOptions) -> Result<DeviceSession> {
+    /// «Отключить»: close the USB device (drop `StLink` → leave debug mode,
+    /// release the interface) so other programs can use the probe.
+    pub fn disconnect(&mut self) {
+        if self.link.take().is_some() {
+            info!("probe {} released", self.info.id);
+        }
+        self.opts = None;
+        self.target = None;
+    }
+
+    fn connect_inner(&mut self, opts: ConnectOptions) -> Result<DeviceSession> {
         self.target = None;
         let link = self.open()?;
         let conn = Self::connect(link, &opts)?;
@@ -264,6 +276,39 @@ impl Worker {
         let r = (|| Ok(self.link()?.reset_and_run()?))();
         self.after(r)
     }
+
+    /// Erase the entire flash; the core stays halted.
+    pub fn erase_all(
+        &mut self,
+        cancel: &AtomicBool,
+        mut on_progress: impl FnMut(ProgressDto),
+    ) -> Result<EraseResult> {
+        let started = Instant::now();
+        let r = (|| {
+            let target = self.current_target()?;
+            let mut bank_ms = Vec::new();
+            let mut bank_started = Instant::now();
+            let mut banks = 0;
+            self.link()?.mass_erase(&target, |p| {
+                if p.done > 0 {
+                    bank_ms.push(ms(bank_started));
+                    bank_started = Instant::now();
+                }
+                banks = p.total as u8;
+                on_progress(p.into());
+                check_cancel(cancel)
+            })?;
+            let size = target.flash_size.unwrap_or(0);
+            info!("flash erased: {banks} bank(s), {size} bytes in {:.0} ms", ms(started));
+            Ok(EraseResult {
+                banks,
+                size,
+                elapsed_ms: ms(started),
+                bank_ms,
+            })
+        })();
+        self.after(r)
+    }
 }
 
 fn check_cancel(cancel: &AtomicBool) -> ControlFlow<()> {
@@ -353,6 +398,47 @@ mod tests {
         assert!(flags.register("op1").load(Ordering::Relaxed));
         flags.remove("op1");
         assert!(!flags.register("op1").load(Ordering::Relaxed));
+    }
+
+    /// Bench test (ST-Link + H743): `cargo test -p stlink-rust-ui -- --ignored`.
+    /// While connected the probe is ours; after `disconnect` st-info and
+    /// OpenOCD can use it, and connecting again works.
+    #[test]
+    #[ignore = "needs an ST-Link with a target, st-info and openocd"]
+    fn hw_disconnect_frees_the_probe() {
+        let desc = stlink::list_probes().unwrap_or_default().into_iter().next();
+        assert!(desc.is_some(), "no ST-Link connected");
+        let Some(desc) = desc else { return };
+        let tool_ok = |cmd: &str, args: &[&str]| {
+            std::process::Command::new(cmd)
+                .args(args)
+                .output()
+                .is_ok_and(|o| o.status.success() && !String::from_utf8_lossy(&o.stdout).contains("Found 0"))
+        };
+        let st_info = || tool_ok("st-info", &["--probe"]);
+        let openocd = || {
+            tool_ok(
+                "openocd",
+                &["-f", "interface/stlink.cfg", "-f", "target/stm32h7x.cfg", "-c", "init; shutdown"],
+            )
+        };
+        let opts = ConnectOptions {
+            under_reset: true,
+            ..ConnectOptions::default()
+        };
+
+        let mut w = Worker::new(desc);
+        let s = w.connect_target(opts);
+        assert!(matches!(&s, Ok(s) if s.target.chip_id == 0x450), "{s:?}");
+        assert!(!openocd(), "openocd must not get the probe while we hold it");
+
+        w.disconnect();
+        assert!(st_info(), "st-info --probe after disconnect");
+        assert!(openocd(), "openocd after disconnect");
+
+        let again = w.connect_target(opts);
+        assert!(again.is_ok(), "{again:?}");
+        w.disconnect();
     }
 
     #[test]

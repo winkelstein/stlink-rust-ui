@@ -68,27 +68,29 @@ impl From<&stlink::ProbeVersion> for ProbeVersionDto {
     }
 }
 
-impl ProbeVersionDto {
-    /// Placeholder while the probe cannot be opened (busy, access denied).
-    pub fn unknown() -> Self {
+/// A discovered probe, from the USB descriptor only (the device is not opened).
+#[derive(Debug, Clone, Serialize)]
+pub struct ProbeSummary {
+    pub id: String,
+    pub descriptor: ProbeDescriptorDto,
+}
+
+impl From<&ProbeDescriptor> for ProbeSummary {
+    fn from(d: &ProbeDescriptor) -> Self {
         Self {
-            stlink: 0,
-            jtag: 0,
-            swim: 0,
-            msd: 0,
-            bridge: 0,
-            api: "V2",
-            display: "—".into(),
+            id: probe_id(d),
+            descriptor: d.into(),
         }
     }
 }
 
+/// An opened probe. `version` is `None` until the first successful open.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeInfo {
     pub id: String,
     pub descriptor: ProbeDescriptorDto,
-    pub version: ProbeVersionDto,
+    pub version: Option<ProbeVersionDto>,
     pub target_voltage: Option<f32>,
 }
 
@@ -358,6 +360,15 @@ pub struct WriteResult {
     pub reset_done: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EraseResult {
+    pub banks: u8,
+    pub size: u32,
+    pub elapsed_ms: f64,
+    pub bank_ms: Vec<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveTarget {
     pub name: String,
@@ -387,7 +398,7 @@ pub struct ReadResult {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum DeviceEvent {
     Connected {
-        probe: ProbeInfo,
+        probe: ProbeSummary,
     },
     Disconnected {
         #[serde(rename = "probeId")]

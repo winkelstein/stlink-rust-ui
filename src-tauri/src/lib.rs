@@ -21,22 +21,24 @@ use tracing::{error, info, warn};
 
 use crate::device::CancelFlags;
 use crate::dto::{
-    BinFile, ConnectOptionsDto, DeviceSession, FlashPlan, ProbeInfo, ProgressDto, ReadJob,
-    ReadResult, SaveTarget, WriteJob, WriteResult,
+    BinFile, ConnectOptionsDto, DeviceSession, EraseResult, FlashPlan, ProbeSummary, ProgressDto,
+    ReadJob, ReadResult, SaveTarget, WriteJob, WriteResult,
 };
 use crate::error::{BackendError, Result};
 use crate::files::FileWatchers;
 use crate::hotplug::Probes;
-use crate::settings::QuickWriteStore;
+use crate::logging::{LogEntry, Logs};
+use crate::settings::{AppSettingsStore, QuickWriteStore};
 
 struct AppState {
     probes: Arc<Probes>,
     cancel: CancelFlags,
     watchers: FileWatchers,
     quick: QuickWriteStore,
+    settings: AppSettingsStore,
+    logs: Logs,
     downloads: PathBuf,
     home: Option<PathBuf>,
-    log_path: Option<PathBuf>,
 }
 
 impl AppState {
@@ -77,6 +79,7 @@ struct InitData {
     downloads_dir: String,
     downloads_display: String,
     quick_write: Vec<QuickWriteEntry>,
+    settings: Value,
     log_path: Option<String>,
 }
 
@@ -91,26 +94,41 @@ fn init(state: State<'_, AppState>) -> InitData {
             .into_iter()
             .map(|(uid, settings)| QuickWriteEntry { uid, settings })
             .collect(),
+        settings: state.settings.get(),
         log_path: state
-            .log_path
+            .logs
+            .file
             .as_ref()
             .map(|p| p.to_string_lossy().into_owned()),
     }
 }
 
 #[tauri::command]
-fn list_devices(state: State<'_, AppState>) -> Vec<ProbeInfo> {
+fn list_devices(state: State<'_, AppState>) -> Vec<ProbeSummary> {
     state.probes.list()
 }
 
+/// The user's «Подключиться» (also with other options from an error banner).
 #[tauri::command]
-async fn identify(
+async fn connect(
     state: State<'_, AppState>,
     probe_id: String,
     opts: ConnectOptionsDto,
 ) -> Result<DeviceSession> {
     let actor = state.probes.actor(&probe_id)?;
-    actor.call(move |w| w.identify(opts.into())).await
+    actor.call(move |w| w.connect_target(opts.into())).await
+}
+
+/// «Отключить»: close the probe so other programs can use it.
+#[tauri::command]
+async fn disconnect(state: State<'_, AppState>, probe_id: String) -> Result<()> {
+    let actor = state.probes.actor(&probe_id)?;
+    actor
+        .call(|w| {
+            w.disconnect();
+            Ok(())
+        })
+        .await
 }
 
 #[tauri::command]
@@ -158,6 +176,26 @@ async fn read_flash(
     let r = actor
         .call(move |w| {
             w.read(job, &cancel, |p| {
+                let _ = on_progress.send(p);
+            })
+        })
+        .await;
+    state.cancel.remove(&op_id);
+    r
+}
+
+#[tauri::command]
+async fn erase_all(
+    state: State<'_, AppState>,
+    probe_id: String,
+    op_id: String,
+    on_progress: Channel<ProgressDto>,
+) -> Result<EraseResult> {
+    let actor = state.probes.actor(&probe_id)?;
+    let cancel = state.cancel.register(&op_id);
+    let r = actor
+        .call(move |w| {
+            w.erase_all(&cancel, |p| {
                 let _ = on_progress.send(p);
             })
         })
@@ -250,16 +288,65 @@ fn save_quick_write(state: State<'_, AppState>, uid: String, settings: Value) ->
     state.quick.save(uid, settings)
 }
 
+/// App settings; «Подробный журнал USB» takes effect right away.
+#[tauri::command]
+fn save_settings(state: State<'_, AppState>, settings: Value) -> Result<()> {
+    state.settings.save(settings)?;
+    state.logs.set_verbose(state.settings.verbose_usb());
+    Ok(())
+}
+
+#[tauri::command]
+fn log_entries(state: State<'_, AppState>) -> Vec<LogEntry> {
+    state.logs.entries()
+}
+
+#[tauri::command]
+fn log_clear(state: State<'_, AppState>) {
+    state.logs.clear();
+}
+
+/// Save the journal text (formatted by the frontend) through a save dialog;
+/// returns the path, `None` if cancelled.
+#[tauri::command]
+async fn log_save(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    default_name: String,
+    text: String,
+) -> Result<Option<String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("Log", &["log", "txt"])
+        .set_directory(&state.downloads)
+        .set_file_name(&default_name)
+        .save_file(move |p| {
+            let _ = tx.send(p);
+        });
+    let Some(picked) = rx.await.ok().flatten() else {
+        return Ok(None);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|e| BackendError::other(e.to_string()))?;
+    std::fs::write(&path, text)
+        .map_err(|e| BackendError::other(format!("cannot write {}: {e}", path.display())))?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let paths = app.path();
-    let log_path = paths
-        .app_log_dir()
-        .ok()
-        .and_then(|dir| logging::init(&dir));
+    let config_dir = paths
+        .app_config_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("stlink-rust-ui"));
+    let settings = AppSettingsStore::load(config_dir);
+    let logs = logging::init(paths.app_log_dir().ok().as_deref(), settings.verbose_usb());
+    logs.start_events(app.handle().clone());
     info!(
-        "stlink-rust-ui {} started, log: {:?}",
+        "stlink-rust-ui {} started, log file: {:?}",
         env!("CARGO_PKG_VERSION"),
-        log_path
+        logs.file
     );
     let home = paths.home_dir().ok();
     let downloads = paths
@@ -277,9 +364,10 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         cancel: CancelFlags::default(),
         watchers: FileWatchers::default(),
         quick: QuickWriteStore::load(data_dir),
+        settings,
+        logs,
         downloads,
         home,
-        log_path,
     });
     hotplug::start(app.handle().clone(), probes);
     Ok(())
@@ -294,10 +382,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             init,
             list_devices,
-            identify,
+            connect,
+            disconnect,
             plan_write,
             write_flash,
             read_flash,
+            erase_all,
             cancel_op,
             reset_and_run,
             pick_bin_file,
@@ -307,6 +397,10 @@ pub fn run() {
             watch_file,
             unwatch_file,
             save_quick_write,
+            save_settings,
+            log_entries,
+            log_clear,
+            log_save,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

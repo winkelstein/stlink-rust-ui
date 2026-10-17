@@ -10,14 +10,14 @@ use tauri::{AppHandle, Emitter};
 use tracing::{info, warn};
 
 use crate::device::Actor;
-use crate::dto::{self, DeviceEvent, ProbeInfo};
+use crate::dto::{self, DeviceEvent, ProbeSummary};
 use crate::error::{BackendError, Result};
 
 pub const DEVICE_EVENT: &str = "device-event";
 
 struct Entry {
     actor: Arc<Actor>,
-    info: ProbeInfo,
+    info: ProbeSummary,
 }
 
 #[derive(Default)]
@@ -28,7 +28,7 @@ impl Probes {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub fn list(&self) -> Vec<ProbeInfo> {
+    pub fn list(&self) -> Vec<ProbeSummary> {
         let mut v: Vec<_> = self.lock().values().map(|e| e.info.clone()).collect();
         v.sort_by(|a, b| a.id.cmp(&b.id));
         v
@@ -42,7 +42,7 @@ impl Probes {
     }
 
     /// Diff the current USB probes against the known ones: start workers for
-    /// new probes, drop the workers of removed ones.
+    /// new probes (without opening them), drop the workers of removed ones.
     fn sync(&self, app: &AppHandle) {
         let present = match stlink::list_probes() {
             Ok(p) => p,
@@ -69,9 +69,10 @@ impl Probes {
             if self.lock().contains_key(&id) {
                 continue;
             }
+            let info = ProbeSummary::from(&desc);
             match Actor::spawn(desc) {
-                Ok((actor, info)) => {
-                    info!("probe {id} connected ({})", info.version.display);
+                Ok(actor) => {
+                    info!("probe {id} found: {}", info.descriptor.serial);
                     self.lock().insert(
                         id,
                         Entry {

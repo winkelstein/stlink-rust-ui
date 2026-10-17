@@ -319,6 +319,46 @@ impl StLink {
         self.last_rw_status()
     }
 
+    /// One 16-bit read transfer: `addr` and `len` 2-aligned, `len ≤ MAX_RW32`.
+    /// `Unsupported` if the probe firmware has no 16-bit memory access.
+    pub fn read_mem16(&mut self, addr: u32, len: usize) -> Result<Vec<u8>> {
+        self.check_mem16(addr, len)?;
+        let data = self.transport.command(
+            "READMEM_16BIT",
+            &mem_cmd(dbg::APIV2_READMEM_16BIT, addr, len),
+            len,
+        )?;
+        self.last_rw_status()?;
+        Ok(data)
+    }
+
+    /// One 16-bit write transfer (halfword bus writes, as F0/F1 flash
+    /// programming needs): `addr` and `data.len()` 2-aligned, `len ≤ MAX_RW32`.
+    /// `Unsupported` if the probe firmware has no 16-bit memory access.
+    pub fn write_mem16(&mut self, addr: u32, data: &[u8]) -> Result<()> {
+        self.check_mem16(addr, data.len())?;
+        self.transport.command(
+            "WRITEMEM_16BIT",
+            &mem_cmd(dbg::APIV2_WRITEMEM_16BIT, addr, data.len()),
+            0,
+        )?;
+        self.transport.write_data("WRITEMEM_16BIT", data)?;
+        self.last_rw_status()
+    }
+
+    fn check_mem16(&self, addr: u32, len: usize) -> Result<()> {
+        if !self.caps.mem_16bit {
+            return Err(Error::Unsupported(
+                "16-bit memory access (ST-Link firmware too old; update the probe firmware)",
+            ));
+        }
+        check_align(addr, 2)?;
+        if len == 0 || len % 2 != 0 || len > ProbeCapabilities::MAX_RW32 {
+            return Err(Error::InvalidArgument("16-bit transfer length"));
+        }
+        Ok(())
+    }
+
     /// One 8-bit read transfer, `len ≤ max_rw8`.
     pub fn read_mem8(&mut self, addr: u32, len: usize) -> Result<Vec<u8>> {
         if len == 0 || len > self.caps.max_rw8 {

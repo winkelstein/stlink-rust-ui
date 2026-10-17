@@ -33,6 +33,9 @@ pub(crate) mod debug {
     pub(crate) const APIV2_READ_DEBUG_REG: u8 = 0x36;
     pub(crate) const APIV2_GETLASTRWSTATUS: u8 = 0x3B;
     pub(crate) const APIV2_DRIVE_NRST: u8 = 0x3C;
+    /// 16-bit memory access (firmware with `mem_16bit`).
+    pub(crate) const APIV2_READMEM_16BIT: u8 = 0x47;
+    pub(crate) const APIV2_WRITEMEM_16BIT: u8 = 0x48;
     pub(crate) const APIV2_GETLASTRWSTATUS2: u8 = 0x3E;
     pub(crate) const APIV2_SWD_SET_FREQ: u8 = 0x43;
     pub(crate) const APIV2_INIT_AP: u8 = 0x4B;

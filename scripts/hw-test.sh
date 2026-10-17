@@ -3,6 +3,9 @@
 #
 #   scripts/hw-test.sh                 # non-destructive checks only
 #   scripts/hw-test.sh firmware.bin    # also flash firmware.bin and verify it
+#   scripts/hw-test.sh --erase-all [firmware.bin]
+#                                      # also erase the entire flash (destructive;
+#                                      # firmware.bin, if given, is written back after)
 #
 # Reference tools (st-info, st-flash) are used when installed.
 # The target is reset several times (connect under reset).
@@ -10,6 +13,11 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
+ERASE_ALL=0
+if [[ "${1:-}" == "--erase-all" ]]; then
+    ERASE_ALL=1
+    shift
+fi
 FW="${1:-}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -81,6 +89,16 @@ check "write rejects non-.bin files" \
     bash -c "! '${CLI[*]}' write '$TMP/z.hex'"
 check "flash unchanged after rejected writes" bash -c "
     '${CLI[*]}' ${R[*]} read '$TMP/c.bin' --size 0x20000 >/dev/null && cmp -s '$TMP/a.bin' '$TMP/c.bin'"
+
+if [[ $ERASE_ALL -eq 1 ]]; then
+    check "erase-all erases both banks" \
+        bash -c "'${CLI[*]}' ${R[*]} erase-all | grep -q 'bank 2/2 erased'"
+    check "whole flash reads as 0xFF after erase-all" bash -c "
+        '${CLI[*]}' ${R[*]} --freq 4000 read '$TMP/erased.bin' >/dev/null &&
+        size=\$(wc -c <'$TMP/erased.bin' | tr -d ' ') &&
+        [[ \$size -gt 0 ]] &&
+        cmp -s '$TMP/erased.bin' <(head -c \$size /dev/zero | tr '\\0' '\\377')"
+fi
 
 if [[ -n "$FW" ]]; then
     check "write $FW with verify and reset" \

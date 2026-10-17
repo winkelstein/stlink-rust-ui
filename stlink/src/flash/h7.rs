@@ -26,6 +26,7 @@ const KEY2: u32 = 0xCDEF_89AB;
 const CR_LOCK: u32 = 1 << 0;
 const CR_PG: u32 = 1 << 1;
 const CR_SER: u32 = 1 << 2;
+const CR_BER: u32 = 1 << 3;
 /// PSIZE = x32 parallelism.
 const CR_PSIZE_X32: u32 = 0b10 << 4;
 const CR_START: u32 = 1 << 7;
@@ -48,6 +49,8 @@ const PROGRAM_TIMEOUT: Duration = Duration::from_millis(100);
 const PROGRAM_CHUNK: usize = 1024;
 /// RM0433: sector erase is ~2 s max at x32; leave margin.
 const ERASE_TIMEOUT: Duration = Duration::from_secs(10);
+/// RM0433: bank erase is ~16 s max at x32 (8 sectors); leave margin.
+const BANK_ERASE_TIMEOUT: Duration = Duration::from_secs(40);
 
 pub(crate) struct H7Flash {
     geometry: FlashGeometry,
@@ -133,6 +136,16 @@ impl FlashDriver for H7Flash {
         link.write_u32(Self::reg(bank, CR), cr)?;
         link.write_u32(Self::reg(bank, CR), cr | CR_START)?;
         let r = Self::wait_idle(link, bank, SR_BSY | SR_QW, ERASE_TIMEOUT);
+        link.write_u32(Self::reg(bank, CR), 0)?;
+        r
+    }
+
+    fn erase_bank(&mut self, link: &mut StLink, bank: u8) -> Result<()> {
+        // BER erases the user flash of one bank; option bytes stay untouched.
+        let cr = CR_BER | CR_PSIZE_X32;
+        link.write_u32(Self::reg(bank, CR), cr)?;
+        link.write_u32(Self::reg(bank, CR), cr | CR_START)?;
+        let r = Self::wait_idle(link, bank, SR_BSY | SR_QW, BANK_ERASE_TIMEOUT);
         link.write_u32(Self::reg(bank, CR), 0)?;
         r
     }

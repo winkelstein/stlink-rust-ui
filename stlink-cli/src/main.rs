@@ -95,6 +95,8 @@ enum Command {
         #[arg(long)]
         no_reset: bool,
     },
+    /// Erase the entire flash (every bank). Destructive; the core stays halted.
+    EraseAll,
 }
 
 /// `0x0800_0000`, `0X100` or decimal.
@@ -156,6 +158,7 @@ fn main() -> anyhow::Result<()> {
             no_verify,
             no_reset,
         } => commands::write(first()?, &settings, &file, addr, !no_verify, !no_reset),
+        Command::EraseAll => commands::erase_all(first()?, &settings),
     }
 }
 

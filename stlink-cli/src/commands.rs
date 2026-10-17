@@ -258,3 +258,34 @@ pub fn write(
     }
     Ok(())
 }
+
+pub fn erase_all(desc: &ProbeDescriptor, settings: &Settings) -> anyhow::Result<()> {
+    let mut link = settings.open(desc)?;
+    settings.connect(&mut link)?;
+    let target = link.identify().context("cannot identify target")?;
+    println!(
+        "{}: erasing the entire flash ({} bytes)",
+        target.chip.map_or("unknown", |c| c.dev_type.as_str()),
+        target.flash_size.unwrap_or(0)
+    );
+    let started = std::time::Instant::now();
+    let mut bank_started = started;
+    link.mass_erase(&target, |p| {
+        if p.done > 0 {
+            println!(
+                "  bank {}/{} erased in {:.2} s",
+                p.done,
+                p.total,
+                bank_started.elapsed().as_secs_f64()
+            );
+            bank_started = std::time::Instant::now();
+        }
+        std::ops::ControlFlow::Continue(())
+    })
+    .context("erase failed")?;
+    println!(
+        "flash erased in {:.2} s; core halted",
+        started.elapsed().as_secs_f64()
+    );
+    Ok(())
+}

@@ -23,6 +23,8 @@ pub(crate) trait FlashDriver {
     fn unlock(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
     fn lock(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
     fn erase_sector(&mut self, link: &mut StLink, sector: &Sector) -> Result<()>;
+    /// Erase the whole bank (user flash only, never option bytes).
+    fn erase_bank(&mut self, link: &mut StLink, bank: u8) -> Result<()>;
     /// Program `data` at `addr`: aligned to the write granularity, one bank.
     fn program(&mut self, link: &mut StLink, addr: u32, data: &[u8]) -> Result<()>;
 }
@@ -320,6 +322,32 @@ impl StLink {
         Ok(())
     }
 
+    /// Erase the whole flash, bank by bank (progress: `Erasing`, done/total in
+    /// banks). Checks RDP first; halts the core, which stays halted. Cancelling
+    /// is possible between banks. Option bytes are never touched.
+    pub fn mass_erase(
+        &mut self,
+        target: &TargetInfo,
+        mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
+    ) -> Result<()> {
+        let mut driver = target_driver(target)?;
+        let banks = bank_count(&driver.geometry());
+        if let Some(chip) = target.chip {
+            self.ensure_unprotected(chip)?;
+        }
+        info!("mass erase: {banks} bank(s)");
+        self.halt()?;
+        erase_banks(banks, &mut on_progress, |bank| {
+            driver.unlock(self, bank)?;
+            let r = driver.erase_bank(self, bank);
+            if let Err(e) = driver.lock(self, bank) {
+                warn!("cannot lock flash bank {}: {e}", bank + 1);
+            }
+            debug!("bank {} erased", bank + 1);
+            r
+        })
+    }
+
     /// `FlashProtected` unless RDP is level 0 (or unknown for this family).
     fn ensure_unprotected(&mut self, chip: &ChipDescriptor) -> Result<()> {
         match self.read_protection(chip)? {
@@ -342,6 +370,37 @@ impl StLink {
         debug!("RDP register 0x{addr:08X} = 0x{reg:08X} → {level:?}");
         Ok(Some(level))
     }
+}
+
+fn bank_count(g: &FlashGeometry) -> u8 {
+    (g.size / g.bank_size.max(1)).clamp(1, u32::from(u8::MAX)) as u8
+}
+
+/// Erase banks `0..banks` in order, reporting progress before the first and
+/// after each bank; a `Break` stops before the next bank.
+fn erase_banks(
+    banks: u8,
+    on_progress: &mut dyn FnMut(Progress) -> ControlFlow<()>,
+    mut erase: impl FnMut(u8) -> Result<()>,
+) -> Result<()> {
+    let report = |done: u8, f: &mut dyn FnMut(Progress) -> ControlFlow<()>| {
+        let p = Progress {
+            stage: Stage::Erasing,
+            done: u64::from(done),
+            total: u64::from(banks),
+        };
+        if f(p).is_break() {
+            Err(Error::Cancelled)
+        } else {
+            Ok(())
+        }
+    };
+    report(0, on_progress)?;
+    for bank in 0..banks {
+        erase(bank)?;
+        report(bank + 1, on_progress)?;
+    }
+    Ok(())
 }
 
 /// CRC-32 (IEEE 802.3, as zlib/`crc32` tools).
@@ -425,6 +484,76 @@ mod tests {
             plan_write(&target(0x419, Some(2 << 20)), 0x0800_0000, 32),
             Err(Error::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn erase_banks_in_order_with_progress() {
+        let mut erased = Vec::new();
+        let mut seen = Vec::new();
+        let r = erase_banks(
+            2,
+            &mut |p| {
+                seen.push((p.done, p.total));
+                ControlFlow::Continue(())
+            },
+            |b| {
+                erased.push(b);
+                Ok(())
+            },
+        );
+        assert!(r.is_ok());
+        assert_eq!(erased, [0, 1]);
+        assert_eq!(seen, [(0, 2), (1, 2), (2, 2)]);
+    }
+
+    #[test]
+    fn erase_banks_cancel_between_banks() {
+        let mut erased = Vec::new();
+        let r = erase_banks(
+            2,
+            &mut |p| {
+                if p.done == 1 {
+                    ControlFlow::Break(())
+                } else {
+                    ControlFlow::Continue(())
+                }
+            },
+            |b| {
+                erased.push(b);
+                Ok(())
+            },
+        );
+        assert!(matches!(r, Err(Error::Cancelled)));
+        assert_eq!(erased, [0]);
+    }
+
+    #[test]
+    fn erase_banks_stops_on_error() {
+        let mut calls = 0;
+        let r = erase_banks(
+            2,
+            &mut |_| ControlFlow::Continue(()),
+            |_| {
+                calls += 1;
+                Err(Error::FlashOperation { status: 0x20000 })
+            },
+        );
+        assert!(matches!(r, Err(Error::FlashOperation { .. })));
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn bank_count_from_geometry() {
+        let g = FlashGeometry {
+            base: 0x0800_0000,
+            size: 2 << 20,
+            bank_size: 1 << 20,
+            sector_size: 128 << 10,
+            write_granularity: 32,
+            erased_value: 0xFF,
+        };
+        assert_eq!(bank_count(&g), 2);
+        assert_eq!(bank_count(&FlashGeometry { bank_size: 2 << 20, ..g }), 1);
     }
 
     #[test]

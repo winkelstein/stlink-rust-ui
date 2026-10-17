@@ -51,7 +51,14 @@ impl Actor {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(Box::new(move |w| {
-                let _ = tx.send(f(w));
+                let r = f(w);
+                // The journal shows what the UI reports by kind only.
+                if let Err(e) = &r
+                    && e.kind != ErrorKind::Cancelled
+                {
+                    warn!("{:?}: {}", e.kind, e.message);
+                }
+                let _ = tx.send(r);
             }))
             .map_err(|_| BackendError::disconnected())?;
         rx.await.map_err(|_| BackendError::disconnected())?

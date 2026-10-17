@@ -283,9 +283,10 @@ export class Controller {
     }
   }
 
-  async dropFile(file: File) {
+  /** A dropped `.bin`: a browser `File` or a path (native window). */
+  async dropFile(source: File | string) {
     try {
-      const f = await this.backend.acceptDroppedFile(file);
+      const f = typeof source === "string" ? await this.backend.openFile(source) : await this.backend.acceptDroppedFile(source);
       this.store.dispatch({ type: "fileChosen", file: f });
     } catch (e) {
       this.store.dispatch({ type: "operationRejected", error: toBackendError(e), context: "write" });

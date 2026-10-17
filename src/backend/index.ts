@@ -1,5 +1,6 @@
 import type { Backend } from "./Backend";
 import { MockBackend } from "./mock/MockBackend";
+import { TauriBackend } from "./TauriBackend";
 
 export type { Backend } from "./Backend";
 
@@ -8,13 +9,8 @@ export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/**
- * Mock without Tauri or with `VITE_BACKEND=mock`. Inside Tauri the mock is
- * used too until the command bridge exists.
- */
-export function createBackend(): Backend {
+/** `TauriBackend` inside Tauri; the mock in the browser or with `VITE_BACKEND=mock`. */
+export async function createBackend(): Promise<Backend> {
   if (import.meta.env.VITE_BACKEND === "mock" || !isTauri()) return new MockBackend();
-  // TODO(stage2): `TauriBackend` over `invoke` + events (src-tauri commands).
-  console.warn("TauriBackend is not implemented yet, using MockBackend");
-  return new MockBackend();
+  return TauriBackend.create();
 }

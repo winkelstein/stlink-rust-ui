@@ -6,7 +6,8 @@ Desktop-приложение для STM32: чтение/запись проши�
 
 ## Текущий этап
 - Этап 1 (библиотека `stlink/` + стенд `stlink-cli/`) — M0–M3 для H7 готовы и проверены на стенде. Следующий шаг — **Этап 2: GUI** (Tauri 2 + React 19 + TS в `src-tauri/`, `src/`), см. «Заметки к Этапу 2».
-- Отложено: M3 для других семейств (F4/F427, затем F1, L4, G4, G0, F0, F7), M4 DFU (нет железа), hot-plug (`nusb::watch_devices`, PRD F1).
+- Этап 2: фронтенд и бэкенд Tauri подключены к библиотеке (hot-plug, identify/чтение/запись, быстрая запись).
+- Отложено: M3 для других семейств (F4/F427, затем F1, L4, G4, G0, F0, F7), M4 DFU (нет железа).
 - Режим записи flash решён (открытый вопрос 1 PRD): прямая запись регистров по SWD пакетами по 1 КБ, flash loader не нужен. H743: программирование ~87 КБ/с @1.8 МГц, ~137 КБ/с @4 МГц; стирание ~0.95 с на сектор 128 КБ.
 
 ## Стенд
@@ -48,8 +49,9 @@ Desktop-приложение для STM32: чтение/запись проши�
 - **Подтверждения:** перед `write_flash` показать, какие сектора будут стёрты (`flash::plan_write`), и что `under_reset`/`keep_debug_in_low_power` меняют состояние таргета (сброс; DBGMCU_CR до выключения питания).
 - **Настройки** (PRD §6): частота SWD (по умолчанию `session::DEFAULT_SWD_KHZ`), verify, connect under reset, keep debug in low-power.
 - **Логи для багрепортов:** tracing-subscriber в Tauri с уровнем `trace` для `stlink` в файл/буфер; `nusb` при не-trace уровне выключать (дублирует наши ошибки).
-- **Сборка:** `src-tauri` сейчас исключён из workspace (`exclude` в корневом `Cargo.toml`). При старте Этапа 2 — добавить в `members`, перенести его `[profile.release]` в корневой `Cargo.toml` (профили членов workspace игнорируются), добавить зависимость `stlink.workspace = true`.
-- **Не готово для GUI:** hot-plug (`nusb::watch_devices`), запись для семейств кроме H74x/H75x/H72x/H73x (`Error::Unsupported`), DFU.
+- **Сборка:** `src-tauri` — член workspace; его `[profile.release]` живёт в корневом `Cargo.toml` (профили членов игнорируются). Запуск: `npm run tauri dev`; `VITE_BACKEND=mock` — фронтенд на `MockBackend`.
+- **Бэкенд GUI (`src-tauri/src`):** `device` (актор на программатор, `Worker`), `hotplug` (`nusb::watch_devices` → пересканирование → событие `device-event`), `dto` (зеркало `src/backend/types.ts`), `error` (`{ kind, message }`), `files` (`.bin`, CRC, notify-наблюдатель за каталогом), `settings` (`quick-write.json` в app data), `logging` (`~/Library/Logs/<id>/stlink-ui.log`, `stlink=trace`). Прогресс — `ipc::Channel`, отмена — `cancel_op(opId)`. Фронтенд: `src/backend/TauriBackend.ts`.
+- **Не готово для GUI:** запись для семейств кроме H74x/H75x/H72x/H73x (`Error::Unsupported`), DFU, экраны журнала и настроек.
 
 ## Правила
 - USB только через `nusb` (не rusb/libusb). Логи — `tracing`. Ошибки — `thiserror` в библиотеке, `anyhow` только в CLI.

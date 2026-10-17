@@ -21,6 +21,7 @@ const CORE_NAMES: Record<CoreInfo["core"], string> = {
   M3: "Cortex-M3",
   M4: "Cortex-M4",
   M7: "Cortex-M7",
+  M23: "Cortex-M23",
   M33: "Cortex-M33",
   Unknown: "Неизвестное ядро",
 };

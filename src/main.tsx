@@ -7,15 +7,22 @@ import { initialState } from "./state/machine";
 import { createStore } from "./state/store";
 import "./styles/tokens.css";
 
-const backend = createBackend();
-const ctl = new Controller(backend, createStore(initialState));
-// Outside React: StrictMode must not start hot-plug twice.
-ctl.start();
-
 if (isTauri()) document.body.classList.add("tauri");
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App ctl={ctl} />
-  </React.StrictMode>,
+void createBackend().then(
+  (backend) => {
+    const ctl = new Controller(backend, createStore(initialState));
+    // Outside React: StrictMode must not start hot-plug twice.
+    ctl.start();
+    ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+      <React.StrictMode>
+        <App ctl={ctl} />
+      </React.StrictMode>,
+    );
+  },
+  (e: unknown) => {
+    console.error("cannot start the backend", e);
+    const root = document.getElementById("root");
+    if (root) root.textContent = `Не удалось запустить: ${e instanceof Error ? e.message : String(e)}`;
+  },
 );

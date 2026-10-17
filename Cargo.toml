@@ -1,8 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["stlink", "stlink-cli"]
-# GUI (Этап 2) пока вне workspace, чтобы `cargo check --workspace` не собирал Tauri.
-exclude = ["src-tauri"]
+members = ["stlink", "stlink-cli", "src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,6 +16,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 clap = { version = "4.6", features = ["derive"] }
+futures-lite = "2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -27,5 +26,11 @@ unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 
+# Profiles of workspace members are ignored: the Tauri app's release profile lives here.
+# https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
 panic = "abort"
+strip = true

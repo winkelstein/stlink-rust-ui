@@ -1,5 +1,5 @@
 // DTOs of the backend contract. They mirror the `stlink` library types and
-// are the shape the future Tauri commands will serialize (camelCase).
+// are the shape the Tauri commands serialize (camelCase, `src-tauri/src/dto.rs`).
 
 /** Stable id of a connected probe (`bus_id:device_address`). */
 export type ProbeId = string;
@@ -56,7 +56,7 @@ export interface Connection {
 }
 
 /** `arm::CoreType`. */
-export type CoreType = "M0" | "M0Plus" | "M3" | "M4" | "M7" | "M33" | "Unknown";
+export type CoreType = "M0" | "M0Plus" | "M3" | "M4" | "M7" | "M23" | "M33" | "Unknown";
 
 /** `arm::CoreInfo`. */
 export interface CoreInfo {

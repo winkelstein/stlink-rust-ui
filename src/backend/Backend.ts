@@ -28,8 +28,8 @@ export interface OpOptions {
 
 /**
  * Everything the UI needs from the device side. Implemented by `MockBackend`
- * now and by a Tauri command bridge later. All failures reject with
- * `BackendFailure`.
+ * (browser, `VITE_BACKEND=mock`) and `TauriBackend` (src-tauri commands).
+ * All failures reject with `BackendFailure`.
  */
 export interface Backend {
   readonly kind: "mock" | "tauri";
@@ -50,6 +50,10 @@ export interface Backend {
   pickBinFile(): Promise<BinFile | null>;
   /** A `.bin` dropped onto the window (browser drag-and-drop). */
   acceptDroppedFile(file: File): Promise<BinFile>;
+  /** Files dropped onto the native window (Tauri delivers paths, not `File`s). */
+  watchFileDrops(cb: (paths: string[]) => void): Unsubscribe;
+  /** A file by absolute path (native drop). */
+  openFile(path: string): Promise<BinFile>;
   /** Save dialog; `null` if cancelled. */
   pickSavePath(defaultName: string): Promise<SaveTarget | null>;
   /** Default location for dumps (before the user picks one). */

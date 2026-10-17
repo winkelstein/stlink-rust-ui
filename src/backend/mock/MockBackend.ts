@@ -396,6 +396,15 @@ export class MockBackend implements Backend {
     return this.fromFile(file);
   }
 
+  watchFileDrops(): Unsubscribe {
+    // The browser delivers drops as DOM events (`acceptDroppedFile`).
+    return () => undefined;
+  }
+
+  async openFile(path: string): Promise<BinFile> {
+    throw fail("Unsupported", `${path}: no file system access in the browser`);
+  }
+
   defaultSaveTarget(defaultName: string): SaveTarget {
     return { name: defaultName, dir: "~/Downloads", path: null };
   }

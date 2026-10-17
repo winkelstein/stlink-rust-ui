@@ -3,7 +3,7 @@ import { isTauri } from "./backend";
 import { MockBackend } from "./backend/mock/MockBackend";
 import { DevPanel } from "./dev/DevPanel";
 import { WindowChrome } from "./components/WindowChrome";
-import { isBusy, stepOf } from "./state/machine";
+import { isBusy, stepOf, type AppState } from "./state/machine";
 import type { Controller } from "./state/controller";
 import { useAppState } from "./state/store";
 import { useDarkMode } from "./useDarkMode";
@@ -53,8 +53,9 @@ export default function App({ ctl }: { ctl: Controller }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [ctl, mock]);
 
-  // Drag-and-drop of a .bin onto the window (browser; Tauri delivers paths via its own events).
-  const canDrop = !!s.session?.target.geometry && !isBusy(s) && ["device", "write", "writeDone"].includes(s.screen);
+  // Drag-and-drop of a .bin onto the window: DOM events in the browser,
+  // paths from the native window in Tauri.
+  const canDrop = canDropIn(s);
   const onDragOver = (e: DragEvent) => {
     if (!canDrop || !e.dataTransfer.types.includes("Files")) return;
     e.preventDefault();
@@ -64,17 +65,17 @@ export default function App({ ctl }: { ctl: Controller }) {
     if (!canDrop) return;
     e.preventDefault();
     const f = e.dataTransfer.files[0];
-    if (!f) return;
-    if (!f.name.toLowerCase().endsWith(".bin")) {
-      ctl.store.dispatch({
-        type: "operationRejected",
-        context: "write",
-        error: { kind: "Unsupported", message: `«${f.name}»: поддерживаются только файлы .bin` },
-      });
-      return;
-    }
-    void ctl.dropFile(f).then(() => ctl.store.dispatch({ type: "navigate", to: "write" }));
+    if (f) acceptDrop(ctl, f.name, f);
   };
+  useEffect(
+    () =>
+      ctl.backend.watchFileDrops((paths) => {
+        if (!canDropIn(ctl.store.getState())) return;
+        const path = paths[0];
+        acceptDrop(ctl, path.split("/").pop() ?? path, path);
+      }),
+    [ctl],
+  );
 
   return (
     <Ctx.Provider value={ctx}>
@@ -93,6 +94,23 @@ export default function App({ ctl }: { ctl: Controller }) {
       </div>
     </Ctx.Provider>
   );
+}
+
+function canDropIn(s: AppState): boolean {
+  return !!s.session?.target.geometry && !isBusy(s) && ["device", "write", "writeDone"].includes(s.screen);
+}
+
+/** Only `.bin`; then open the write form with the file. */
+function acceptDrop(ctl: Controller, name: string, source: File | string) {
+  if (!name.toLowerCase().endsWith(".bin")) {
+    ctl.store.dispatch({
+      type: "operationRejected",
+      context: "write",
+      error: { kind: "Unsupported", message: `«${name}»: поддерживаются только файлы .bin` },
+    });
+    return;
+  }
+  void ctl.dropFile(source).then(() => ctl.store.dispatch({ type: "navigate", to: "write" }));
 }
 
 function Screen() {

@@ -49,6 +49,12 @@ fn target_driver(target: &TargetInfo) -> Result<Box<dyn FlashDriver>> {
     driver_for(chip, flash_size)
 }
 
+/// Flash layout of a supported target; `Unsupported` if there is no flash
+/// driver for the chip (writing is not possible then).
+pub fn geometry(target: &TargetInfo) -> Result<FlashGeometry> {
+    Ok(target_driver(target)?.geometry())
+}
+
 /// Validate a write and list the sectors it will erase, without touching the
 /// target (e.g. for a confirmation dialog).
 pub fn plan_write(target: &TargetInfo, addr: u32, len: usize) -> Result<WritePlan> {

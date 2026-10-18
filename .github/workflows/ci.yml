@@ -85,7 +85,16 @@ jobs:
 
       - name: Build the app
         shell: bash
-        run: npm run tauri build -- ${{ matrix.bundle_args }}
+        run: |
+          args=(${{ matrix.bundle_args }})
+          # MSI versions are numeric (X.Y.Z.N): a prerelease like 0.1.1-rc.1
+          # needs an override, as in release.yml.
+          version="$(node -p 'require("./package.json").version')"
+          if [[ "$RUNNER_OS" == Windows && "$version" == *-* ]]; then
+            echo "{\"bundle\":{\"windows\":{\"wix\":{\"version\":\"${version%%-*}.0\"}}}}" > "$RUNNER_TEMP/wix.json"
+            args+=(--config "$(cygpath -m "$RUNNER_TEMP/wix.json")")
+          fi
+          npm run tauri build -- "${args[@]}"
 
       - uses: actions/upload-artifact@v7.0.2
         with:

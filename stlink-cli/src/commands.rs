@@ -232,12 +232,15 @@ pub fn write(
     settings.connect(&mut link)?;
     let target = link.identify().context("cannot identify target")?;
     let plan = stlink::flash::plan_write(&target, addr, data.len()).context("invalid write")?;
+    let unit =
+        stlink::flash::geometry(&target).map_or("sector", |g| stlink::flash::unit_name(g.unit));
+    let n = plan.sectors.len();
     println!(
-        "{}: writing {} bytes (CRC32 0x{:08X}) to 0x{addr:08X}, erasing {} sector(s)",
+        "{}: writing {} bytes (CRC32 0x{:08X}) to 0x{addr:08X}, erasing {n} {unit}{}",
         target.chip.map_or("unknown", |c| c.dev_type.as_str()),
         data.len(),
         crc32(&data),
-        plan.sectors.len()
+        if n == 1 { "" } else { "s" }
     );
 
     let mut progress = ProgressPrinter::new();

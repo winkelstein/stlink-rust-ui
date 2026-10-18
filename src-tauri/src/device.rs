@@ -433,19 +433,6 @@ mod tests {
                 })
         };
         let st_info = || tool_ok("st-info", &["--probe"]);
-        let openocd = || {
-            tool_ok(
-                "openocd",
-                &[
-                    "-f",
-                    "interface/stlink.cfg",
-                    "-f",
-                    "target/stm32h7x.cfg",
-                    "-c",
-                    "init; shutdown",
-                ],
-            )
-        };
         let opts = ConnectOptions {
             under_reset: true,
             ..ConnectOptions::default()
@@ -453,7 +440,29 @@ mod tests {
 
         let mut w = Worker::new(desc);
         let s = w.connect_target(opts);
-        assert!(matches!(&s, Ok(s) if s.target.chip_id == 0x450), "{s:?}");
+        // OpenOCD target config from the family: "STM32F1xx_MD" → stm32f1x.cfg.
+        let family = s
+            .as_ref()
+            .ok()
+            .and_then(|s| s.target.chip.as_ref())
+            .and_then(|c| c.dev_type.strip_prefix("STM32"))
+            .and_then(|t| t.get(..2))
+            .map(str::to_ascii_lowercase);
+        assert!(family.is_some(), "a known chip: {s:?}");
+        let target_cfg = format!("target/stm32{}x.cfg", family.unwrap_or_default());
+        let openocd = || {
+            tool_ok(
+                "openocd",
+                &[
+                    "-f",
+                    "interface/stlink.cfg",
+                    "-f",
+                    &target_cfg,
+                    "-c",
+                    "init; shutdown",
+                ],
+            )
+        };
         assert!(
             !openocd(),
             "openocd must not get the probe while we hold it"

@@ -86,9 +86,16 @@ if [[ "$FTYPE" == "H7" ]]; then
 fi
 
 
-check "regs: PC in flash, core resumed" bash -c "
-    out=\$('${CLI[*]}' regs 2>&1)
-    echo \"\$out\" | grep -qE 'pc +0x08' && echo \"\$out\" | grep -q resumed || { echo \"\$out\"; false; }"
+# A blank chip has no reset vector: the core sits in lockup, PC is not in flash.
+if "${CLI[@]}" "${R[@]}" mem 0x08000004 1 2>/dev/null | grep -q 0xFFFFFFFF; then
+    check "regs (blank flash): registers read, core resumed" bash -c "
+        out=\$('${CLI[*]}' regs 2>&1)
+        echo \"\$out\" | grep -qE 'pc +0x' && echo \"\$out\" | grep -q resumed || { echo \"\$out\"; false; }"
+else
+    check "regs: PC in flash, core resumed" bash -c "
+        out=\$('${CLI[*]}' regs 2>&1)
+        echo \"\$out\" | grep -qE 'pc +0x08' && echo \"\$out\" | grep -q resumed || { echo \"\$out\"; false; }"
+fi
 
 check "read $RSIZE bytes at 1.8 and 4 MHz match" bash -c "
     '${CLI[*]}' ${R[*]} read '$TMP/a.bin' --size $RSIZE >/dev/null &&

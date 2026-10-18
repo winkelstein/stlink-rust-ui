@@ -136,18 +136,22 @@ pub fn list_probes() -> Result<Vec<ProbeDescriptor>> {
 }
 
 /// Serial from the OS-cached string; if it is not usable, read the raw descriptor.
+///
+/// macOS replaces the raw-byte serial of some clones with `"?"`, so a string
+/// that is not a full-length serial is only a last resort.
 fn resolve_serial(info: &DeviceInfo) -> String {
-    if let Some(s) = info.serial_number().and_then(serial_from_string) {
-        return s;
+    let cached = info.serial_number().and_then(serial_from_string);
+    if let Some(s) = cached.as_ref().filter(|s| s.len() == SERIAL_LEN) {
+        return s.clone();
     }
-    match read_raw_serial_descriptor(info) {
-        Ok(Some(raw)) => serial_from_descriptor(&raw).unwrap_or_default(),
-        Ok(None) => String::new(),
+    let raw = match read_raw_serial_descriptor(info) {
+        Ok(raw) => raw.and_then(|raw| serial_from_descriptor(&raw)),
         Err(e) => {
             debug!("cannot read serial descriptor: {e}");
-            String::new()
+            None
         }
-    }
+    };
+    raw.or(cached).unwrap_or_default()
 }
 
 fn read_raw_serial_descriptor(info: &DeviceInfo) -> Result<Option<Vec<u8>>> {

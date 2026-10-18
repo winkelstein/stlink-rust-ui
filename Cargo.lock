@@ -3374,7 +3374,7 @@ checksum = "ff7589a1859b09232522bb9edf076ca7fcf14ded96685d3fa629db73023ffbb7"
 
 [[package]]
 name = "stlink"
-version = "0.1.1-rc.1"
+version = "0.1.1-rc.2"
 dependencies = [
  "nusb",
  "thiserror 2.0.21",
@@ -3383,7 +3383,7 @@ dependencies = [
 
 [[package]]
 name = "stlink-cli"
-version = "0.1.1-rc.1"
+version = "0.1.1-rc.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "stlink-rust-ui"
-version = "0.1.1-rc.1"
+version = "0.1.1-rc.2"
 dependencies = [
  "futures-lite",
  "notify",

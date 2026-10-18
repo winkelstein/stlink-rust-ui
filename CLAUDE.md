@@ -7,13 +7,14 @@ Full requirements: @docs/PRD-stlink-rust-ui-2026-10-17.md
 ## Current stage
 - Stage 1 (library `stlink/` + test bench `stlink-cli/`): M0–M3 for H7 are done and verified on the bench; full erase is available (`flash::mass_erase`, H7 bank erase ~5.5 s per 1 MB bank).
 - Stage 2 (GUI, Tauri 2 + React 19 + TS in `src-tauri/`, `src/`): screens and sheets per `docs/design/`, explicit connect/disconnect, write/read/full erase, quick flash, settings, log, ru/en. See "Stage 2 notes".
-- M3b (more families): flash drivers for F0/F1/F3 (+ F1 XL), F2/F4, F7, G4 — tested against the register model `flash/fake.rs` only, not on hardware yet (checklist: `docs/hardware-checklist.md`; F427 bench planned). Layouts in `stlink/chips/layouts.txt`.
+- M3b (more families): flash drivers for F0/F1/F3 (+ F1 XL), F2/F4, F7, G4, tested against the register model `flash/fake.rs`; F1 verified on hardware (STM32F103C8T6), the rest not yet (checklist: `docs/hardware-checklist.md`; F427 bench planned). Layouts in `stlink/chips/layouts.txt`.
 - Deferred: L4, G0, L0/L1 and other families, M4 DFU (no hardware yet).
-- Flash write mode is settled (PRD open question 1): direct register writes over SWD in 1 KB chunks, no flash loader. H743: programming ~87 KB/s @1.8 MHz, ~137 KB/s @4 MHz; erase ~0.95 s per 128 KB sector.
+- Flash write mode (PRD open question 1): H7, F2/F4/F7, G4 — direct register writes over SWD in 1 KB chunks. H743: programming ~87 KB/s @1.8 MHz, ~137 KB/s @4 MHz; erase ~0.95 s per 128 KB sector. F0/F1/F3 — a 32-byte loader in SRAM (`f0f1::LOADER`, run via `StLink::run_routine`), because halfwords streamed over SWD are dropped while the flash is busy; F103: ~21.5 KB/s, 29 ms per page erase.
 
 ## Test bench
 - The bench is macOS (Apple Silicon). Windows is supported (platform code behind `cfg(windows)`, verified by CI and the manual checklist in `docs/windows.md`; there is no Windows hardware for development). Linux builds in CI without dedicated support.
 - Probe: ST-Link V2 clone `0483:3748`, firmware V2J46S7 (references: `st-info`, `st-flash`, `openocd`).
+- Second target: STM32F103C8T6 (chip id `0x410`, 64 KB, 1 KB pages; the clone's USB serial string reads as `?` on macOS, so the raw descriptor is used).
 - Target: STM32H743VIT6 (Cortex-M7, chip id `0x450`, DBGMCU_IDCODE at `0x5C001000` / via AP2 at `0xE00E1000`, 2 MB flash, 2 banks, 128 KB sectors, 32-byte program granularity).
 - Bench quirks (important for debugging):
   - The firmware enters low-power with debug clocks off (`DBGMCU_CR = 0`) → AP0 returns stale data **with an OK status**. Use `keep_debug_in_low_power` (once after power-up) or `under_reset`.
@@ -56,7 +57,7 @@ Full requirements: @docs/PRD-stlink-rust-ui-2026-10-17.md
 - **Build:** `src-tauri` is a workspace member; its `[profile.release]` lives in the root `Cargo.toml` (member profiles are ignored). Run: `npm run tauri dev`; `VITE_BACKEND=mock` runs the frontend on `MockBackend`.
 - **GUI backend (`src-tauri/src`):** `device` (actor per probe, `Worker`; the probe is opened only by the `connect` command, `disconnect` drops `StLink`), `hotplug` (`nusb::watch_devices` → rescan → `device-event` with the USB descriptor, without opening), `dto` (mirror of `src/backend/types.ts`), `error` (`{ kind, message }`), `files` (`.bin`, CRC, notify watcher on the directory), `settings` (`quick-write.json` in app data, `settings.json` in app config), `logging` (ring buffer of 5000 lines + `log://entry`, file `~/Library/Logs/<id>/stlink-ui.log`; `stlink` TRACE only with "Verbose USB log", via `reload::Handle`). Progress via `ipc::Channel`, cancellation via `cancel_op(opId)`. Frontend: `src/backend/TauriBackend.ts`, strings in `src/i18n/{ru,en}.ts`.
 - **Platforms:** all frontend platform logic is in `src/platform.ts` (⌘/Ctrl, Finder/Explorer); window config in `tauri.macos.conf.json` (overlay titlebar, ad-hoc signing) and `tauri.windows.conf.json` (native frame). On Windows nusb only works with WinUSB: a different driver → `Error::DriverMissing`, "in use" (ACCESS_DENIED/SHARING_VIOLATION) → `Busy`.
-- **Not ready in the GUI:** write and erase for families other than H74x/H75x/H72x/H73x (`Error::Unsupported`), DFU.
+- **Not ready in the GUI:** write and erase for families without a flash driver (`Error::Unsupported`, e.g. L4, G0), DFU.
 
 ## Rules
 - Language: everything in the repository is in English (docs, comments, commit messages, CLI output, log messages). The only Russian text is the UI translation in `src/i18n/ru.ts` and tests that check Russian formatting.

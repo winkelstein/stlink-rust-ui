@@ -43,10 +43,6 @@ export function bankCount(g: FlashGeometry): number {
   return Math.max(1, g.banks.length);
 }
 
-export function inFlash(g: FlashGeometry, addr: number): boolean {
-  return addr >= g.base && addr < flashEnd(g);
-}
-
 /** Bank number (0-based) of an address inside flash; the last bank otherwise. */
 export function bankOf(g: FlashGeometry, addr: number): number {
   const i = g.banks.findIndex((b) => addr >= b.base && addr < b.base + b.size);

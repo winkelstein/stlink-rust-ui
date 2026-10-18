@@ -166,7 +166,7 @@ Found 1 stlink programmers
 - Steps: validation (the file fits in flash, the address is aligned) → halt → unlock → erase the affected sectors/pages → program → lock → verify (read back + compare or CRC32) → reset/run (optional).
 - Flash drivers per family through a shared `FlashDriver` trait. Order: **H7** (bench, done), then F4 (F427), F1, G4, F7, F0, then L4, G0.
 - H7 specifics: 2 banks, 128 KB sectors, 256-bit (32-byte) program words; the buffer is padded with `0xFF` to a multiple of 32.
-- Write mode (decided): direct flash register writes over SWD in 1 KB chunks; a RAM flash loader is not needed at the measured speeds.
+- Write mode (decided): direct flash register writes over SWD in 1 KB chunks (H7, F2/F4/F7, G4). F0/F1/F3 program through a small loader in SRAM: halfwords streamed over SWD faster than the flash programs them are dropped without an error (seen on an F103 at 1.8 MHz).
 - Progress by stage: `Erasing`, `Programming`, `Verifying`; cancellation between blocks.
 - Full erase (mass erase) per bank, only on explicit request with a confirmation.
 - **Acceptance criteria:**
@@ -207,7 +207,7 @@ Implemented; the design and behavior are described in `docs/design/README.md` (s
 | CLI | [`clap`](https://docs.rs/clap) | Subcommands `list`, `probe`, `regs`, `mem`, `read`, `write`, `erase-all`, `dfu ...` |
 | Async runtime | A dedicated worker thread per device + `futures-lite::block_on` for nusb; `tauri::async_runtime` in Tauri | Keep tokio out of the library |
 | GUI | Tauri 2 + React 19 + TypeScript + Vite | Already set up in the repository |
-| CI/CD | GitHub Actions: macOS / Windows / Ubuntu, `tauri-action` for releases | See `docs/release.md` |
+| CI/CD | GitHub Actions: macOS / Windows / Ubuntu; tagged releases publish installers, CLI archives, checksums and a GHCR OCI artifact | See `docs/release.md` |
 | References | [stlink](https://github.com/stlink-org/stlink) (BSD-3), [OpenOCD](https://openocd.org) (GPL-2.0, protocol knowledge only), [probe-rs](https://github.com/probe-rs/probe-rs) (MIT/Apache) | Protocol, clone workarounds, chip tables |
 | ST documentation | RM0433 (H7), RM0090 (F42x/F43x), RM0368 (F401/F411), RM0008 (F1), RM0091 (F0), RM0440 (G4), RM0385/RM0410 (F7), AN3156 (USB DFU), AN2606 (system bootloader), UM1075 (DfuSe) | Flash registers, DfuSe, bootloader |
 
@@ -279,7 +279,7 @@ stlink-rust-ui/
 | **M1** | Discovery + probe + registers | F1, F2 (basic commands), F3 (memory, halt, registers), F4 (chip table) | `stlink-cli probe` on H743 matches `st-info --probe`; `stlink-cli regs` prints core registers | Done |
 | M2 | Flash read | F5, progress, SWD clock | The dump matches `st-flash read` | Done |
 | M3 | Flash write (ST-Link), H7 | F6 for H7, full erase | Write + verify on H743 | Done |
-| **M3b** | More families | F6 for F0, F1, F4, G4, F7 (plus F2, F3 on the same controllers) | Write + verify + erase all on each family (`docs/hardware-checklist.md`) | Drivers done and tested against a register model; hardware verification pending (F427 first) |
+| **M3b** | More families | F6 for F0, F1, F4, G4, F7 (plus F2, F3 on the same controllers) | Write + verify + erase all on each family (`docs/hardware-checklist.md`) | Drivers done and tested against a register model; F1 verified on an STM32F103C8T6; the others pending (F427 next) |
 | M4 | DFU | F7 on F427 | Write + verify via DfuSe | Waiting for hardware |
 | M5 | GUI | F8: Tauri commands and events, React screens | The full read/write flow from the GUI | Done |
 | M6 | Platforms and formats | Windows (done), CI/CD (done), `.hex`, Linux polish | See §11 | In progress |
@@ -316,7 +316,7 @@ stlink-rust-ui/
 
 ## 12. Open questions
 
-1. ~~Flash write mode through ST-Link: direct (registers) or a RAM flash loader.~~ Decided: direct register writes in 1 KB chunks (H743: ~87 KB/s at 1.8 MHz, ~137 KB/s at 4 MHz).
+1. ~~Flash write mode through ST-Link: direct (registers) or a RAM flash loader.~~ Decided: direct register writes in 1 KB chunks (H743: ~87 KB/s at 1.8 MHz, ~137 KB/s at 4 MHz); F0/F1/F3 use an SRAM loader (F103: ~21.5 KB/s).
 2. Should `stlink-cli` have JSON output (for tests and integrations)?
 3. Minimum macOS version.
 4. Should the GUI support several ST-Links connected at once.

@@ -26,11 +26,19 @@ const H7: FamilySpeed = {
   read: 148 * KIB,
 };
 
+const F0F1: FamilySpeed = {
+  eraseUnit: () => 0.03,
+  eraseBankPerMb: 0.5,
+  program: 21 * KIB,
+  verify: 100 * KIB,
+  read: 100 * KIB,
+};
+
 const BY_FLASH_TYPE: Record<string, FamilySpeed> = {
   H7,
-  // TODO(measure): F0/F1/F3 — page erase ≤ 40 ms plus USB round trips, halfword programming.
-  F0_F1_F3: { eraseUnit: () => 0.06, eraseBankPerMb: 1, program: 20 * KIB, verify: 100 * KIB, read: 100 * KIB },
-  F1_XL: { eraseUnit: () => 0.06, eraseBankPerMb: 1, program: 20 * KIB, verify: 100 * KIB, read: 100 * KIB },
+  // F103C8, measured at 1.8 MHz: 29 ms per 1 KiB page, 0.03 s mass erase, 21.5 KiB/s programming (SRAM loader).
+  F0_F1_F3: F0F1,
+  F1_XL: F0F1,
   // TODO(measure): F2/F4/F7 — sector erase ≈ 0.3 s + 13 ms/KB (x32), bank erase up to 16 s/MB.
   F2_F4: { eraseUnit: (size) => 0.3 + (size / KIB) * 0.013, eraseBankPerMb: 12, program: 60 * KIB, verify: 120 * KIB, read: 120 * KIB },
   F7: { eraseUnit: (size) => 0.3 + (size / KIB) * 0.013, eraseBankPerMb: 12, program: 60 * KIB, verify: 120 * KIB, read: 120 * KIB },
@@ -42,9 +50,6 @@ const BY_FLASH_TYPE: Record<string, FamilySpeed> = {
 export function speedFor(flashType: string | null | undefined): FamilySpeed {
   return (flashType && BY_FLASH_TYPE[flashType]) || H7;
 }
-
-/** The bench (H743) speeds, kept for callers without a chip. */
-export const SPEED = H7;
 
 export const WRITE_STAGES: readonly WriteStage[] = ["erasing", "programming", "verifying"];
 

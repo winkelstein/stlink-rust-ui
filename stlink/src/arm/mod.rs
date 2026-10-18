@@ -19,8 +19,19 @@ pub const DHCSR: u32 = 0xE000_EDF0;
 const DBGKEY: u32 = 0xA05F << 16;
 const C_DEBUGEN: u32 = 1 << 0;
 const C_HALT: u32 = 1 << 1;
+const C_MASKINTS: u32 = 1 << 3;
+const S_REGRDY: u32 = 1 << 16;
 const S_HALT: u32 = 1 << 17;
 const S_RESET_ST: u32 = 1 << 25;
+/// Debug Core Register Selector and Data registers.
+const DCRSR: u32 = 0xE000_EDF4;
+const DCRDR: u32 = 0xE000_EDF8;
+const DCRSR_REGWNR: u32 = 1 << 16;
+/// DCRSR register numbers.
+const REG_SP: u8 = 13;
+const REG_PC: u8 = 15;
+const REG_XPSR: u8 = 16;
+const XPSR_THUMB: u32 = 1 << 24;
 /// Debug Exception and Monitor Control Register.
 const DEMCR: u32 = 0xE000_EDFC;
 const VC_CORERESET: u32 = 1 << 0;
@@ -38,6 +49,8 @@ const ARM_IMPLEMENTER: u8 = 0x41;
 const HALT_TIMEOUT: Duration = Duration::from_millis(500);
 const RESET_HALT_TIMEOUT: Duration = Duration::from_millis(200);
 const WAIT_RETRIES: usize = 3;
+/// DHCSR polls for S_REGRDY after a DCRSR write.
+const REGRDY_POLLS: usize = 10;
 
 /// Cortex-M core type from CPUID PARTNO.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,6 +230,62 @@ impl StLink {
             }
         }
         Ok((regs?, was_running))
+    }
+
+    /// Write a core register of the halted core through DCRSR/DCRDR
+    /// (0–12 = R0–R12, 13 = SP, 14 = LR, 15 = PC, 16 = xPSR).
+    pub(crate) fn write_core_reg(&mut self, reg: u8, value: u32) -> Result<()> {
+        self.write_u32(DCRDR, value)?;
+        self.write_u32(DCRSR, DCRSR_REGWNR | u32::from(reg))?;
+        for _ in 0..REGRDY_POLLS {
+            let dhcsr = self.read_u32(DHCSR)?;
+            if dhcsr & DHCSR_RESERVED == 0 && dhcsr & S_REGRDY != 0 {
+                return Ok(());
+            }
+        }
+        debug!("core register {reg} write not acknowledged");
+        Err(Error::Timeout)
+    }
+
+    /// Run a routine already loaded in RAM on the halted core until it halts
+    /// again (on `BKPT`): R0–R3 = `args`, SP = `sp`, PC = `entry` (Thumb).
+    /// Interrupts stay masked while it runs. Returns R0 and R1; on timeout
+    /// the core is halted and `Timeout` returned.
+    pub(crate) fn run_routine(
+        &mut self,
+        entry: u32,
+        args: [u32; 4],
+        sp: u32,
+        timeout: Duration,
+    ) -> Result<[u32; 2]> {
+        for (reg, value) in (0u8..).zip(args) {
+            self.write_core_reg(reg, value)?;
+        }
+        self.write_core_reg(REG_SP, sp)?;
+        self.write_core_reg(REG_PC, entry & !1)?;
+        self.write_core_reg(REG_XPSR, XPSR_THUMB)?;
+        // C_MASKINTS may only change while the core is halted.
+        self.write_u32(DHCSR, DBGKEY | C_DEBUGEN | C_HALT | C_MASKINTS)?;
+        self.write_u32(DHCSR, DBGKEY | C_DEBUGEN | C_MASKINTS)?;
+        let start = Instant::now();
+        let finished = loop {
+            if self.is_halted()? {
+                break true;
+            }
+            if start.elapsed() > timeout {
+                break false;
+            }
+            thread::sleep(Duration::from_millis(1));
+        };
+        if !finished {
+            debug!("routine at 0x{entry:08X} still running after {timeout:?}");
+            self.halt()?;
+        }
+        self.write_u32(DHCSR, DBGKEY | C_DEBUGEN | C_HALT)?;
+        if !finished {
+            return Err(Error::Timeout);
+        }
+        Ok([self.read_core_reg(0)?, self.read_core_reg(1)?])
     }
 
     fn read_halted_registers(&mut self) -> Result<CoreRegisters> {

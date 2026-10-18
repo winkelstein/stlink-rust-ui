@@ -34,13 +34,13 @@
 | Family | Identify | Read | Flash / erase | Verified |
 |---|---|---|---|---|
 | STM32H72x/H73x, H74x/H75x | ✅ | ✅ | ✅ | on hardware (STM32H743) |
-| STM32F0, F1 (incl. XL-density), F3 | ✅ | ✅ | ✅ | tests only |
+| STM32F0, F1 (incl. XL-density), F3 | ✅ | ✅ | ✅ | on hardware (STM32F103C8); F0, F3, F1 XL: tests only |
 | STM32F2, F4 (incl. F42x/F43x dual bank) | ✅ | ✅ | ✅ | tests only (F427 planned) |
 | STM32F7 | ✅ | ✅ | ✅ | tests only |
 | STM32G4 | ✅ | ✅ | ✅ | tests only |
 | Other STM32 (from the stlink chip table) | ✅ | ✅ | Not yet | |
 
-"Tests only" means the flash driver is tested against a register model of the controller (`stlink/src/flash/fake.rs`), not yet on a real board; the steps to verify a family are in [docs/hardware-checklist.md](docs/hardware-checklist.md). F0/F1/F3 need ST-Link firmware with 16-bit memory access (V2 J26 or later). USB DFU (flashing through the STM32 system bootloader without a probe) is planned.
+"Tests only" means the flash driver is tested against a register model of the controller (`stlink/src/flash/fake.rs`), not yet on a real board; the steps to verify a family are in [docs/hardware-checklist.md](docs/hardware-checklist.md). USB DFU (flashing through the STM32 system bootloader without a probe) is planned.
 
 ## Install
 

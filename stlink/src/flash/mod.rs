@@ -31,7 +31,7 @@ pub use geometry::{EraseUnit, FlashBank, FlashGeometry, Sector, SectorRun, Write
 
 use mem::Memory;
 
-/// Per-family flash controller.
+/// Per-family flash controller. The core is halted before any call.
 pub(crate) trait FlashDriver {
     fn geometry(&self) -> &FlashGeometry;
     fn unlock(&mut self, m: &mut dyn Memory, bank: u8) -> Result<()>;
@@ -58,7 +58,10 @@ fn driver_for(
         "H7" if chip.flash_pagesize == 128 * 1024 => {
             Box::new(h7::H7Flash::new(build(EraseUnit::Sector, 32)?))
         }
-        "F0_F1_F3" | "F1_XL" => Box::new(f0f1::F0F1Flash::new(build(EraseUnit::Page, 2)?)),
+        "F0_F1_F3" | "F1_XL" => Box::new(f0f1::F0F1Flash::new(
+            build(EraseUnit::Page, 2)?,
+            chip.sram_size,
+        )?),
         "F2_F4" | "F7" => {
             let psize = f4::Psize::for_voltage(voltage);
             Box::new(f4::SectorFlash::new(

@@ -12,12 +12,19 @@ pub(crate) trait Memory {
     fn write_u32(&mut self, addr: u32, value: u32) -> Result<()>;
     /// 32-bit bus writes; `addr` and `data.len()` 4-aligned, any length.
     fn write_block32(&mut self, addr: u32, data: &[u8]) -> Result<()>;
-    /// 16-bit bus writes (F0/F1 flash programming); 2-aligned, any length.
-    fn write_block16(&mut self, addr: u32, data: &[u8]) -> Result<()>;
     /// 8-bit bus writes (F2/F4/F7 programming below 2.7 V).
     fn write_block8(&mut self, addr: u32, data: &[u8]) -> Result<()>;
     fn read_block(&mut self, addr: u32, len: usize) -> Result<Vec<u8>>;
     fn halt(&mut self) -> Result<()>;
+    /// Run a routine loaded in target RAM on the halted core until it halts;
+    /// returns R0 and R1 (see `StLink::run_routine`).
+    fn run_routine(
+        &mut self,
+        entry: u32,
+        args: [u32; 4],
+        sp: u32,
+        timeout: Duration,
+    ) -> Result<[u32; 2]>;
     /// Pause between status polls (the fake does not wait).
     fn delay(&mut self, d: Duration);
 }
@@ -56,13 +63,6 @@ impl Memory for StLink {
         Ok(())
     }
 
-    fn write_block16(&mut self, addr: u32, data: &[u8]) -> Result<()> {
-        for (a, off, n) in chunks(addr, data.len(), ProbeCapabilities::MAX_RW32) {
-            self.write_mem16(a, &data[off..off + n])?;
-        }
-        Ok(())
-    }
-
     fn write_block8(&mut self, addr: u32, data: &[u8]) -> Result<()> {
         let max = self.capabilities().max_rw8;
         for (a, off, n) in chunks(addr, data.len(), max) {
@@ -77,6 +77,16 @@ impl Memory for StLink {
 
     fn halt(&mut self) -> Result<()> {
         StLink::halt(self)
+    }
+
+    fn run_routine(
+        &mut self,
+        entry: u32,
+        args: [u32; 4],
+        sp: u32,
+        timeout: Duration,
+    ) -> Result<[u32; 2]> {
+        StLink::run_routine(self, entry, args, sp, timeout)
     }
 
     fn delay(&mut self, d: Duration) {

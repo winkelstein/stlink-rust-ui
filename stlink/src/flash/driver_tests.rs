@@ -7,6 +7,7 @@ use std::ops::ControlFlow;
 
 use super::fake::{FakeFlash, Family};
 use super::geometry::{Sector, pad};
+use super::mem::Memory;
 use super::{FlashDriver, driver_for, f4, ops};
 use crate::{Error, Result, chips};
 
@@ -121,6 +122,7 @@ fn erase_error(chip_id: u16, size: u32, dual: Option<bool>, bits: u32) -> Result
 /// Program the same range twice without erasing: the model must refuse.
 fn reprogram_is_caught(chip_id: u16, size: u32, dual: Option<bool>) -> Result<()> {
     let (mut d, mut f) = setup(chip_id, size, dual, None)?;
+    f.halt()?; // as `ops::write` does
     let s = d.geometry().sectors()[0];
     d.unlock(&mut f, 0)?;
     d.erase_sector(&mut f, &s)?;
@@ -141,6 +143,7 @@ fn reprogram_is_caught(chip_id: u16, size: u32, dual: Option<bool>) -> Result<()
 /// complains, the driver reports the error flag.
 fn program_locked_is_caught(chip_id: u16, size: u32, dual: Option<bool>) -> Result<()> {
     let (mut d, mut f) = setup(chip_id, size, dual, None)?;
+    f.halt()?; // as `ops::write` does
     let s = d.geometry().sectors()[0];
     let r = d.program(&mut f, s.addr, &image(64));
     assert!(r.is_err());
@@ -155,6 +158,21 @@ fn f103c8_write_with_odd_length() -> Result<()> {
     // 64 KiB, 1 KiB pages: 2049 bytes → 3 pages, padded to 2050.
     let s = write_and_check(0x410, 64 * KIB, None, 0x0800_0400, 2049)?;
     assert_eq!(s.iter().map(|s| s.index).collect::<Vec<_>>(), vec![1, 2, 3]);
+    Ok(())
+}
+
+#[test]
+fn f103c8_programs_through_the_loader() -> Result<()> {
+    let (mut d, mut f) = setup(0x410, 64 * KIB, None, None)?;
+    let mut data = image(7000);
+    data[4096..6144].fill(0xFF); // a blank buffer's worth is skipped
+    let plan = d.geometry().plan_write(0x0800_0000, data.len())?;
+    let img = pad(&data, plan.padded_len as usize, 0xFF);
+    ops::write(&mut f, d.as_mut(), &plan, &img, true, &mut go)?;
+    assert!(f.violations.is_empty(), "{:#?}", f.violations);
+    assert_eq!(&f.flash[..data.len()], &data[..]);
+    // 2 KiB per loader run: 0–2K, 2K–4K, (4K–6K blank), 6K–7000.
+    assert_eq!(f.routines, 3);
     Ok(())
 }
 

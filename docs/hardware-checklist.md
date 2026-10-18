@@ -7,7 +7,7 @@ Status:
 | Family | Driver | Verified on hardware |
 |---|---|---|
 | H74x/H75x, H72x/H73x | `flash/h7.rs` | yes, STM32H743VIT6 |
-| F0, F1, F3 (+ F1 XL) | `flash/f0f1.rs` | not yet |
+| F0, F1, F3 (+ F1 XL) | `flash/f0f1.rs` | F1 yes, STM32F103C8T6 (F0, F3, F1 XL not yet) |
 | F2, F4 | `flash/f4.rs` | not yet (STM32F427 planned) |
 | F7 | `flash/f4.rs` (same controller) | not yet |
 | G4 | `flash/g4.rs` | not yet |
@@ -16,7 +16,7 @@ Status:
 
 - Note the board's firmware so you can restore it: `stlink-cli read backup.bin` (the whole flash).
 - Firmware that sleeps with debug clocks off: run once `stlink-cli --keep-debug-in-low-power probe` after power-up, or add `--connect-under-reset`.
-- ST-Link firmware: F0/F1/F3 need 16-bit memory access (V2 firmware J26 or later). Older firmware gets `unsupported: 16-bit memory access`; update the probe with ST's ST-LinkUpgrade.
+- Write at both 1.8 MHz (default) and 4 MHz (`--freq 4000`). Words streamed over SWD faster than the flash programs them can be dropped without any error flag: on the F103 over a third of the halfwords were lost at 1.8 MHz until F0/F1/F3 moved to an SRAM loader. F2/F4/F7 and G4 still stream words over SWD, so a failed verify there points to the same cause.
 
 ## Automated
 

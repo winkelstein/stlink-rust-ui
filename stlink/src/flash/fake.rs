@@ -6,11 +6,14 @@
 //! controller would set): writing while locked, a wrong key order, flash
 //! writes without PG, a wrong bus width or PSIZE, misaligned double words,
 //! programming a word that is not blank, a bad SNB/PNB, starting an operation
-//! while busy, any write to an option register.
+//! while busy, any write to an option register. F0/F1/F3 programming runs
+//! the SRAM loader (`f0f1::LOADER`), emulated here; streaming several
+//! halfwords over the bus is a violation (the real controller drops them).
 
 use std::collections::HashMap;
 use std::time::Duration;
 
+use super::f0f1::LOADER;
 use super::geometry::FlashGeometry;
 use super::mem::Memory;
 use crate::{Error, Result};
@@ -83,7 +86,14 @@ pub(crate) struct FakeFlash {
     pub halted: bool,
     /// Start addresses of the erased units, in order (`u32::MAX` = bank `n` as `MAX - n`).
     pub erased: Vec<u32>,
+    /// SRAM at `RAM_BASE`.
+    ram: Vec<u8>,
+    /// Routines run on the core.
+    pub routines: u32,
 }
+
+const RAM_BASE: u32 = 0x2000_0000;
+const RAM_SIZE: usize = 64 * 1024;
 
 impl FakeFlash {
     /// A locked controller with the whole flash filled with `fill`.
@@ -109,6 +119,8 @@ impl FakeFlash {
             busy_polls: 0,
             halted: false,
             erased: Vec::new(),
+            ram: vec![0; RAM_SIZE],
+            routines: 0,
         }
     }
 
@@ -466,13 +478,13 @@ impl FakeFlash {
             );
             return;
         }
-        if self.busy_polls > 0 && self.family != Family::F0F1 {
-            // F0/F1 stall the bus instead.
+        if self.busy_polls > 0 {
             self.violation(set, "flash write while BSY".into(), bits.seq);
             return;
         }
         let ok_width = match self.family {
-            Family::F0F1 => width == 16,
+            // One halfword per write: the next one would arrive while BSY.
+            Family::F0F1 => width == 16 && data.len() == 2,
             Family::F4 => {
                 let psize = match (cr >> 8) & 0b11 {
                     0 => 8,
@@ -515,7 +527,16 @@ impl FakeFlash {
         self.busy_polls = 1;
     }
 
+    fn ram_range(&self, addr: u32, len: usize) -> Option<std::ops::Range<usize>> {
+        let off = addr.checked_sub(RAM_BASE)? as usize;
+        (off + len <= self.ram.len()).then_some(off..off + len)
+    }
+
     fn write(&mut self, addr: u32, data: &[u8], width: u32) -> Result<()> {
+        if let Some(r) = self.ram_range(addr, data.len()) {
+            self.ram[r].copy_from_slice(data);
+            return Ok(());
+        }
         if self.in_flash(addr) {
             if !self.in_flash(addr + data.len() as u32 - 1) {
                 return Err(Error::InvalidArgument("fake: write past the end of flash"));
@@ -578,18 +599,14 @@ impl Memory for FakeFlash {
         self.write(addr, data, 32)
     }
 
-    fn write_block16(&mut self, addr: u32, data: &[u8]) -> Result<()> {
-        if addr % 2 != 0 || data.len() % 2 != 0 {
-            return Err(Error::InvalidArgument("fake: unaligned 16-bit write"));
-        }
-        self.write(addr, data, 16)
-    }
-
     fn write_block8(&mut self, addr: u32, data: &[u8]) -> Result<()> {
         self.write(addr, data, 8)
     }
 
     fn read_block(&mut self, addr: u32, len: usize) -> Result<Vec<u8>> {
+        if let Some(r) = self.ram_range(addr, len) {
+            return Ok(self.ram[r].to_vec());
+        }
         Ok((0..len as u32)
             .map(|i| {
                 let a = addr.wrapping_add(i);
@@ -605,6 +622,50 @@ impl Memory for FakeFlash {
     fn halt(&mut self) -> Result<()> {
         self.halted = true;
         Ok(())
+    }
+
+    /// Emulates `f0f1::LOADER`: one halfword at a time, BSY waited out,
+    /// stop on PGERR/WRPRTERR.
+    fn run_routine(
+        &mut self,
+        entry: u32,
+        args: [u32; 4],
+        _sp: u32,
+        _timeout: Duration,
+    ) -> Result<[u32; 2]> {
+        if !self.halted {
+            return Err(Error::InvalidArgument(
+                "fake: routine run on a running core",
+            ));
+        }
+        let code = self.ram_range(entry, LOADER.len()).map(|r| &self.ram[r]);
+        if self.family != Family::F0F1 || code != Some(&LOADER[..]) {
+            return Err(Error::InvalidArgument("fake: unknown routine"));
+        }
+        self.routines += 1;
+        let [src, dst, count, sr_addr] = args;
+        let set = self
+            .set_of_reg(sr_addr)
+            .filter(|(_, r)| r.sr == sr_addr)
+            .map(|(set, _)| set)
+            .ok_or(Error::InvalidArgument("fake: loader without an SR address"))?;
+        let mut left = count;
+        let mut sr = 0;
+        while left > 0 {
+            let i = count - left;
+            let half = self
+                .ram_range(src + 2 * i, 2)
+                .map(|r| self.ram[r].to_vec())
+                .ok_or(Error::InvalidArgument("fake: loader source outside SRAM"))?;
+            self.write(dst + 2 * i, &half, 16)?;
+            self.busy_polls = 0;
+            sr = self.banks[set].sr;
+            if sr & ((1 << 2) | (1 << 4)) != 0 {
+                break;
+            }
+            left -= 1;
+        }
+        Ok([left, sr])
     }
 
     fn delay(&mut self, _d: Duration) {}
